@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Amanat Diary"
+version = "1.0.0"
+id = "artifacts/amanat-diary"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 25745
+
+[services.development]
+run = "pnpm --filter @workspace/amanat-diary run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/amanat-diary", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/amanat-diary", "run", "serve" ]
+
+[services.env]
+PORT = "25745"
+BASE_PATH = "/"

@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "L573lIRmu_F6cKQAoEcBR"
+uri = "file://artifacts/amanat-diary/assets/images/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "axdsNsT9a6-vKe-k-hWHa"
+uri = "file://artifacts/amanat-diary/assets/images/splash.png"
+type = "image"
+title = "generated_image"

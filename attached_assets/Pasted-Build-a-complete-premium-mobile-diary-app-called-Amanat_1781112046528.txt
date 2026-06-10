@@ -1,0 +1,1316 @@
+Build a complete premium mobile diary app called “Amanat Diary” / “Dear Future”. It must feel like a real light-theme diary, not a boring notes app. The UI should be simple, beautiful, emotional, premium, clean, paper-inspired, and easy like ChatGPT.
+
+Do not force login. On first launch, user creates a private local diary and sets an app PIN/passcode/biometric lock. Account login should be optional only for cloud backup, sync, restore, and future delivery.
+
+Main features:
+- Multiple diaries/notebooks
+- Each diary has cover, name, category, mood style, privacy lock
+- Categories: Personal, School, Work, Dream, Gratitude, Travel, Relationship, Family, Future Letters, Custom
+- Open diary like a real book
+- Swipe left/right to turn pages
+- Page number, date, day, and time automatically added
+- Manual writing and voice writing
+- Voice transcribes into diary text
+- Save original voice with transcript
+- AI suggests title, mood, tags, and optional polished writing
+- Mood-based page themes: happy, sad, emotional, calm, romantic, grateful, motivated, dreamy, neutral
+- Page theme should change subtly based on mood
+- Calendar view
+- Timeline view
+- Search and filters
+- Tags and collections
+- Future message delivery
+- Export diary as PDF/life book
+- Local backup, cloud backup optional
+- App lock, diary lock, entry lock
+- Gentle reminders
+
+Design:
+- Light theme only
+- Warm white, cream, beige, soft pastel tones
+- Real paper feel
+- Premium typography
+- Soft shadows
+- Smooth page-turn animation
+- No dark theme
+- No clutter
+- No childish colors
+- No generic productivity dashboard
+- Writing screen must be extremely simple
+
+Build complete app screens:
+Splash, onboarding, PIN setup, home diary library, create diary, diary cover, book/page view, manual writing, voice recording, entry read mode, calendar, timeline, search, tags, future delivery, settings, privacy, backup, profile, empty states, error states.
+
+Final result should feel like the best diary app in the world: simple, emotional, private, premium, and deeply personal.
+V2 COMPLETE MASTER PROMPT — DEVELOPER READY
+Build a complete production-ready mobile diary app called “Amanat Diary” or “Dear Future”. The app is a premium private memory vault where users can write manually or speak by voice, and their memories become beautiful diary pages inside multiple real-feeling diaries.
+
+This is NOT a simple notes app.
+This is NOT a generic journal app.
+This is NOT a dark productivity app.
+
+This app must feel like:
+- a real diary
+- a premium personal notebook
+- a private emotional memory vault
+- a place where users store their life story
+- simple enough that anyone can use it instantly
+
+The app must have a beautiful light theme only. It should look warm, clean, minimal, emotional, premium, and paper-inspired.
+
+========================================
+IMPORTANT PRODUCT DECISION
+========================================
+
+Do NOT force normal sign up/login at the start.
+
+The app should work first as a private local diary.
+
+First launch flow:
+1. Splash screen
+2. Emotional onboarding
+3. Create app PIN/passcode
+4. Enable biometric unlock optional
+5. Create first diary
+6. Start writing
+
+Authentication/account should be optional only for:
+- cloud backup
+- sync across devices
+- restoring data
+- future message delivery
+- trusted contacts
+
+This app should feel private from the first second.
+
+Security layers:
+- app-level PIN/passcode
+- biometric unlock
+- optional diary-level lock
+- optional entry-level lock
+- hidden diary mode
+- optional cloud account for backup only
+
+========================================
+CORE CONCEPT
+========================================
+
+Users can create multiple diaries for different parts of life.
+
+Examples:
+- Personal Diary
+- School Diary
+- Work Journal
+- Dream Diary
+- Gratitude Journal
+- Travel Memories
+- Relationship Diary
+- Family Memories
+- Future Letters
+- Custom Diary
+
+Each diary should feel like its own book.
+
+When a user opens a diary:
+- show diary cover
+- user taps to open
+- inside, pages appear like a real diary
+- each entry is a page
+- user can swipe left/right to move page by page
+- show page number
+- show total pages
+- date/day/time automatically added
+- writing can be manual or voice-based
+- mood can change page theme subtly
+
+========================================
+DESIGN STYLE
+========================================
+
+Use light theme only.
+
+Visual style:
+- warm white
+- cream
+- beige
+- paper texture
+- soft pastel accents
+- elegant typography
+- subtle shadows
+- soft rounded cards
+- realistic diary feeling
+- clean mobile-first layout
+- calm and emotional design
+- premium spacing
+- smooth animations
+
+Do not use:
+- dark theme
+- harsh gradients
+- neon colors
+- childish graphics
+- cluttered dashboards
+- generic notes app UI
+- messy stickers
+- cheap template look
+
+The app should feel like:
+Apple-level simplicity + premium diary + emotional memory book.
+
+========================================
+DESIGN SYSTEM
+========================================
+
+Create a full design system.
+
+Colors:
+- Background: warm white / cream
+- Surface: paper white
+- Text: deep warm charcoal
+- Secondary text: soft brown/gray
+- Accent: muted gold / soft brown / warm peach
+- Success: soft green
+- Warning: warm amber
+- Sad mood: soft blue-gray
+- Happy mood: warm yellow/peach
+- Romantic mood: muted rose
+- Calm mood: sage green
+- Dream mood: lavender mist
+
+Typography:
+- elegant readable heading font
+- clean body font
+- optional diary-style accent font for titles only
+- body text must always be readable
+
+Spacing:
+- use consistent 8pt spacing system
+- large clean margins
+- page writing area must breathe
+
+Components:
+- diary card
+- diary cover
+- page card
+- page header
+- mood chip
+- tag chip
+- voice recorder button
+- waveform
+- page number
+- bottom toolbar
+- floating write button
+- lock button
+- calendar day marker
+- timeline entry card
+- future delivery card
+- empty state card
+
+========================================
+APP NAVIGATION
+========================================
+
+Main navigation should be simple.
+
+Suggested bottom tabs:
+1. Diaries
+2. Timeline
+3. Write
+4. Calendar
+5. Settings
+
+Or simpler:
+- Home
+- Search
+- Write
+- Calendar
+- Profile
+
+The center Write button should be prominent.
+
+Home must always let user quickly:
+- write manually
+- record voice
+- open a diary
+- search memories
+
+========================================
+SCREEN 1: SPLASH SCREEN
+========================================
+
+Create a beautiful splash screen.
+
+Elements:
+- app logo
+- simple diary icon
+- warm background
+- tagline
+
+Possible tagline:
+“Your life, one beautiful page at a time.”
+
+Keep it minimal and premium.
+
+========================================
+SCREEN 2: ONBOARDING
+========================================
+
+Create emotional onboarding screens.
+
+Onboarding 1:
+Title: “Your private diary, beautifully kept.”
+Description: “Write your thoughts, memories, and feelings in a space that feels truly yours.”
+
+Onboarding 2:
+Title: “Speak, and your voice becomes a page.”
+Description: “Record your thoughts and turn them into clean diary entries with voice transcription.”
+
+Onboarding 3:
+Title: “Create diaries for every part of life.”
+Description: “Personal, school, work, dreams, gratitude, travel, and future letters.”
+
+Onboarding 4:
+Title: “Relive memories like a real book.”
+Description: “Open your diary and swipe through pages just like a real notebook.”
+
+Onboarding 5:
+Title: “Keep memories safe for the future.”
+Description: “Lock your diary, back it up, and schedule selected memories for future delivery.”
+
+Final button:
+“Create My Private Diary”
+
+========================================
+SCREEN 3: PIN / PASSCODE SETUP
+========================================
+
+After onboarding, ask user to set privacy lock.
+
+Options:
+- create 4-digit PIN
+- create 6-digit PIN
+- create password
+- enable Face ID / fingerprint
+- skip only if user confirms
+
+Copy:
+“Your diary is private. Let’s protect it.”
+
+Important:
+- this should replace forced login
+- account creation should not appear here
+- keep it private and simple
+
+========================================
+SCREEN 4: OPTIONAL BACKUP ACCOUNT
+========================================
+
+After PIN setup, show optional backup account prompt.
+
+Title:
+“Want to keep your diary safe if your phone is lost?”
+
+Options:
+- Continue without account
+- Enable secure backup
+
+Explain:
+“Your diary works without an account. Create one only if you want backup, sync, restore, or future delivery.”
+
+This makes trust stronger.
+
+========================================
+SCREEN 5: HOME / DIARY LIBRARY
+========================================
+
+Home is the main screen.
+
+Show:
+- greeting
+- today’s date
+- soft emotional header
+- quick action: Write Today
+- quick action: Speak Today
+- diary library
+- recent memories
+- upcoming future messages
+- search bar
+
+Diary cards show:
+- cover image/style
+- diary name
+- category
+- number of pages
+- last updated
+- lock icon if locked
+- mood accent
+- progress/life story feeling
+
+Example diary card:
+“My Personal Diary”
+“42 pages · Last written today”
+
+Actions:
+- create new diary
+- open diary
+- edit diary
+- lock/unlock diary
+- change cover
+- export diary
+
+========================================
+SCREEN 6: CREATE NEW DIARY
+========================================
+
+User can create multiple diaries.
+
+Fields:
+- diary name
+- subtitle/description
+- diary category
+- cover style
+- accent color
+- privacy setting
+- diary PIN optional
+- default page mood style
+- voice writing enabled
+- future delivery enabled
+- reminder frequency
+
+Diary categories:
+- Personal
+- School
+- Work
+- Dream
+- Gratitude
+- Travel
+- Relationship
+- Family
+- Future Letters
+- Custom
+
+Cover styles:
+- Classic paper diary
+- Leather journal
+- Soft pastel notebook
+- Minimal premium
+- Floral diary
+- School notebook
+- Work planner
+- Travel book
+
+========================================
+SCREEN 7: DIARY COVER / OPENING SCREEN
+========================================
+
+When user taps a diary, show a beautiful diary cover first.
+
+Elements:
+- diary cover
+- diary title
+- subtitle
+- total pages
+- last updated
+- lock state
+- open diary button
+
+Animation:
+- tapping open should feel like opening a real diary
+- smooth transition into book/page view
+
+========================================
+SCREEN 8: DIARY BOOK / PAGE VIEW
+========================================
+
+This is the hero experience of the app.
+
+Requirements:
+- show one page at a time
+- horizontal swipe to next/previous page
+- page-turn animation
+- page number visible
+- total pages visible
+- date visible
+- day visible
+- time visible
+- mood visible
+- page should look like diary paper
+- page should be readable and elegant
+- support edit button
+- support add new page button
+- support voice playback if page has voice
+- support media attachments
+- support page thumbnails/index
+
+Gestures:
+- swipe left = next page
+- swipe right = previous page
+- tap page = reading controls
+- long press = actions
+- pinch = optional zoom/read focus
+
+Toolbar actions:
+- new page
+- edit
+- voice
+- favorite
+- share
+- lock
+- schedule future delivery
+- export
+
+Page header:
+- Monday, 10 June 2026
+- 9:30 PM
+- Page 12
+
+Page footer:
+- Page 12 of 42
+
+========================================
+SCREEN 9: MANUAL WRITING PAGE
+========================================
+
+This screen must be extremely simple.
+
+It should look like a blank diary page.
+
+Auto-added:
+- date
+- day
+- time
+- page number
+- selected diary
+- optional location/weather
+
+User can:
+- write title
+- write body
+- select mood
+- add tags
+- attach photo
+- attach voice
+- lock page
+- save as draft
+- save entry
+- mark favorite
+
+Autosave:
+- every few seconds
+- show subtle “Saved” state
+
+The writing area should not be crowded.
+
+Bottom toolbar:
+- mic
+- mood
+- image
+- tag
+- lock
+- save
+
+========================================
+SCREEN 10: VOICE WRITING PAGE
+========================================
+
+Create a dedicated voice diary screen.
+
+Elements:
+- large microphone button
+- waveform animation
+- recording timer
+- pause/resume
+- stop
+- live transcription area
+- mood detection
+- save original audio
+- convert to diary entry
+- edit transcription
+
+After recording:
+- show transcript
+- AI suggested title
+- AI detected mood
+- AI suggested tags
+- option: keep raw words
+- option: polish beautifully
+- save to selected diary
+
+Languages:
+- English
+- Urdu
+- Roman Urdu
+- scalable for Punjabi/Pashto later
+
+Important:
+voice feature must feel premium and magical.
+
+========================================
+SCREEN 11: MOOD THEME SYSTEM
+========================================
+
+Each page can have a mood.
+
+Mood options:
+- Happy
+- Sad
+- Emotional
+- Calm
+- Grateful
+- Romantic
+- Motivated
+- Angry
+- Reflective
+- Hopeful
+- Dreamy
+- Neutral
+
+Page theme adapts softly:
+- Happy: warm peach/yellow light page
+- Sad: soft blue-gray page
+- Emotional: muted rose/cream page
+- Calm: sage green/cream page
+- Grateful: warm gold/cream page
+- Romantic: soft rose/lavender page
+- Motivated: clean warm energetic page
+- Dreamy: soft lavender mist page
+- Work: clean structured paper
+- School: notebook line paper
+
+Rules:
+- theme must be subtle
+- not childish
+- not too colorful
+- user can turn off mood themes
+- user can manually override mood
+- AI can detect mood from text/voice
+
+========================================
+SCREEN 12: ENTRY READ MODE
+========================================
+
+When user opens one entry, show beautiful read mode.
+
+Features:
+- full-page diary reading
+- date/day/time
+- mood
+- title
+- body
+- photos
+- voice playback
+- tags
+- edit
+- delete
+- share
+- export
+- move to another diary
+- duplicate
+- schedule future delivery
+
+Reading should feel like holding a real memory page.
+
+========================================
+SCREEN 13: TIMELINE
+========================================
+
+Timeline shows all entries from all diaries.
+
+Features:
+- chronological feed
+- filter by diary
+- filter by mood
+- filter by year
+- filter by month
+- filter by tag
+- show memory cards
+- show voice entries
+- show photo entries
+
+Timeline card:
+- date
+- title
+- short preview
+- mood
+- diary name
+- attached media icon
+
+========================================
+SCREEN 14: CALENDAR
+========================================
+
+Calendar view.
+
+Features:
+- monthly calendar
+- dots/mood markers on days with entries
+- tap date to view entries
+- filter by diary
+- mood color indicators
+- “On this day” memories
+
+Calendar should feel clean and beautiful.
+
+========================================
+SCREEN 15: SEARCH
+========================================
+
+Advanced search.
+
+Search by:
+- keyword
+- title
+- diary
+- date
+- mood
+- tag
+- voice entry
+- media entry
+- favorite
+- locked
+- scheduled future message
+
+Search result should show:
+- entry title
+- date
+- diary name
+- preview
+- mood
+
+========================================
+SCREEN 16: TAGS / COLLECTIONS
+========================================
+
+Allow users to create collections.
+
+Examples:
+- My School Memories
+- My Mother
+- 2026 Goals
+- Travel Memories
+- My Sad Days
+- Best Life Moments
+- Future Letters
+
+Features:
+- create collection
+- add entries
+- remove entries
+- view collection like mini diary
+- export collection
+
+========================================
+SCREEN 17: FUTURE MESSAGE DELIVERY
+========================================
+
+This is an emotional premium feature.
+
+User can schedule a diary page/message for future.
+
+Options:
+- send to myself
+- send to loved one
+- unlock on future date
+- send as email later
+- send as notification later
+- keep inside app until date
+
+Flow:
+1. Choose diary entry or create new message
+2. Choose recipient
+3. Choose delivery date
+4. Choose delivery type:
+   - text
+   - voice
+   - full diary page
+   - PDF page
+5. Confirm with PIN
+6. Add to scheduled messages
+
+Important:
+For first production version, make this “scheduled future delivery,” not death verification.
+Death/legacy delivery can be a later advanced feature because it needs more trust and legal handling.
+
+========================================
+SCREEN 18: SCHEDULED MESSAGES
+========================================
+
+Show all future messages.
+
+Card shows:
+- recipient
+- delivery date
+- message type
+- diary name
+- status
+- edit
+- cancel
+- preview
+
+States:
+- scheduled
+- delivered
+- failed
+- canceled
+
+========================================
+SCREEN 19: MEDIA MEMORIES
+========================================
+
+Allow attaching:
+- photos
+- voice notes
+- short video
+- scanned paper note
+- documents later
+
+Media must appear beautifully on diary pages.
+
+Do not make it look like a gallery app.
+Media should feel part of the diary page.
+
+========================================
+SCREEN 20: EXPORT / LIFE BOOK
+========================================
+
+Allow user to export memories.
+
+Options:
+- export one page as image
+- export one entry as PDF
+- export full diary as PDF book
+- export by year
+- export by collection
+- export voice transcript
+- export backup file
+
+PDF should look premium:
+- diary cover
+- table of contents
+- pages with dates
+- mood labels
+- photos
+- clean typography
+
+========================================
+SCREEN 21: PRIVACY SETTINGS
+========================================
+
+Privacy is very important.
+
+Settings:
+- app PIN
+- change PIN
+- biometric unlock
+- auto-lock time
+- hide app content in app switcher
+- lock specific diary
+- lock specific entry
+- hidden diary mode
+- backup encryption
+- trusted recovery contact optional
+
+Copy:
+“Your diary belongs only to you.”
+
+========================================
+SCREEN 22: BACKUP SETTINGS
+========================================
+
+Backup should be optional.
+
+Options:
+- no account / local only
+- secure cloud backup
+- Google Drive backup
+- iCloud backup
+- export backup file
+- restore from backup
+
+Explain clearly:
+“Your diary works without an account. Backup is optional.”
+
+========================================
+SCREEN 23: PROFILE
+========================================
+
+Profile screen:
+- user name optional
+- avatar optional
+- total diaries
+- total pages
+- writing streak
+- voice memories
+- favorite mood
+- future messages
+- memories saved this year
+
+Keep it elegant and minimal.
+
+========================================
+SCREEN 24: SETTINGS
+========================================
+
+Settings list:
+- Profile
+- Privacy lock
+- Diaries
+- Backup & sync
+- Voice transcription
+- Mood themes
+- Reminders
+- Future messages
+- Export data
+- Language
+- Help
+- Delete all data
+- Delete account if account exists
+
+========================================
+SCREEN 25: REMINDERS
+========================================
+
+Gentle reminders:
+- daily writing reminder
+- weekly reflection
+- school diary reminder
+- work journal reminder
+- gratitude reminder
+- future message reminder
+- unfinished draft reminder
+
+Tone examples:
+- “A small page today can become a beautiful memory tomorrow.”
+- “Want to write what your heart felt today?”
+- “Your diary is waiting for today’s story.”
+
+========================================
+EMPTY STATES
+========================================
+
+Create beautiful empty states.
+
+No diaries:
+“Start your first diary.”
+“Your first page is waiting.”
+
+No entries:
+“This diary is empty. Write the first page.”
+
+No voice notes:
+“Speak your first memory.”
+
+No search results:
+“No memory found. Try another word or date.”
+
+No future messages:
+“Schedule a memory for your future self or someone you love.”
+
+========================================
+AI FEATURES
+========================================
+
+AI should be helpful, not intrusive.
+
+Features:
+- voice transcription
+- title suggestion
+- mood detection
+- tag suggestion
+- optional writing polish
+- yearly recap
+- memory summary
+- “On this day” memory
+- search by meaning later
+
+User control:
+- keep original text
+- polish text
+- save both original and polished
+- disable AI mood detection
+
+========================================
+DATA MODEL
+========================================
+
+Create scalable data models.
+
+User:
+- id
+- name optional
+- local profile
+- backup account optional
+- settings
+- createdAt
+
+Diary:
+- id
+- userId/localOwnerId
+- title
+- subtitle
+- category
+- coverStyle
+- accentColor
+- isLocked
+- lockType
+- defaultMoodMode
+- createdAt
+- updatedAt
+
+Entry:
+- id
+- diaryId
+- pageNumber
+- title
+- bodyOriginal
+- bodyPolished optional
+- mood
+- tags
+- date
+- day
+- time
+- location optional
+- weather optional
+- isFavorite
+- isLocked
+- mediaIds
+- audioId optional
+- createdAt
+- updatedAt
+
+VoiceNote:
+- id
+- entryId
+- audioUrl/localPath
+- duration
+- transcript
+- language
+- createdAt
+
+FutureMessage:
+- id
+- entryId optional
+- recipientName
+- recipientEmail optional
+- deliveryDate
+- deliveryType
+- status
+- createdAt
+- updatedAt
+
+Collection:
+- id
+- title
+- description
+- entryIds
+- createdAt
+
+Media:
+- id
+- entryId
+- type
+- url/localPath
+- thumbnail
+- createdAt
+
+Settings:
+- appLockEnabled
+- biometricEnabled
+- autoLockTime
+- moodThemesEnabled
+- backupEnabled
+- transcriptionLanguage
+- reminderSettings
+
+========================================
+TECHNICAL REQUIREMENTS
+========================================
+
+Build the app with:
+- clean architecture
+- reusable components
+- proper navigation
+- local-first storage
+- optional backend sync
+- offline support
+- smooth animations
+- fast search
+- secure local storage
+- media storage
+- voice recording
+- speech-to-text
+- notifications
+- export support
+- proper empty/error/loading states
+
+The app should work without internet for:
+- writing
+- reading
+- creating diary
+- local search
+- local lock
+- local media
+
+Internet needed only for:
+- cloud backup
+- sync
+- AI transcription if using cloud
+- future delivery
+
+========================================
+FINAL QUALITY BAR
+========================================
+
+The final app must feel:
+- simple
+- premium
+- emotional
+- private
+- secure
+- beautiful
+- smooth
+- world-class
+
+Most important screens:
+1. Home diary library
+2. Diary book/page view
+3. Manual writing page
+4. Voice diary page
+5. Mood theme page
+6. Future delivery
+
+Do not skip these.
+
+The app must not feel like a template. It must feel like a real premium product people will emotionally love.
+COMPLETE FEATURE LIST FOR DEVELOPER
+Core
+Multiple diaries
+Create/edit/delete diary
+Diary cover customization
+Diary categories
+Diary lock
+Page-based diary reading
+Swipe page turning
+Page number system
+Auto date/day/time
+Manual writing
+Voice writing
+Voice transcription
+Save original audio
+Mood selection
+Mood-based page themes
+Tags
+Favorites
+Search
+Calendar
+Timeline
+Future message scheduling
+Export PDF
+Local backup
+Optional cloud backup
+App PIN
+Biometric unlock
+Entry lock
+Hidden diary mode
+Premium AI
+AI title suggestion
+AI mood detection
+AI tag suggestion
+AI grammar polish
+Keep original + polished version
+Yearly recap
+Memory summary
+“On this day” memory
+Privacy
+No forced login
+Local-first diary
+App PIN
+Diary PIN
+Entry lock
+Optional account only for backup
+Secure backup
+Export data anytime
+UI/UX
+Light theme only
+Paper-style pages
+Swipe like real diary
+Warm emotional copy
+Simple writing screen
+Smooth animations
+Beautiful empty states
+FULL APP FLOW / SITEMAP
+Splash
+  ↓
+Onboarding
+  ↓
+PIN / Passcode Setup
+  ↓
+Optional Backup Account
+  ↓
+Create First Diary
+  ↓
+Home / Diary Library
+  ├── Create New Diary
+  │     ├── Diary Name
+  │     ├── Category
+  │     ├── Cover Style
+  │     ├── Privacy
+  │     └── Save
+  │
+  ├── Open Diary
+  │     ├── Diary Cover
+  │     └── Book View
+  │           ├── Swipe Pages
+  │           ├── Read Page
+  │           ├── Add New Page
+  │           ├── Edit Page
+  │           ├── Voice Page
+  │           ├── Mood Theme
+  │           ├── Share/Export
+  │           └── Schedule Future Delivery
+  │
+  ├── Write Today
+  │     ├── Select Diary
+  │     ├── Manual Writing
+  │     ├── Add Mood
+  │     ├── Add Tags/Media
+  │     └── Save Page
+  │
+  ├── Speak Today
+  │     ├── Record Voice
+  │     ├── Live Transcription
+  │     ├── AI Title/Mood
+  │     ├── Edit Text
+  │     └── Save Page
+  │
+  ├── Timeline
+  │     ├── All Entries
+  │     ├── Filter by Diary
+  │     ├── Filter by Mood
+  │     └── Open Entry
+  │
+  ├── Calendar
+  │     ├── Month View
+  │     ├── Mood Markers
+  │     └── Date Entries
+  │
+  ├── Search
+  │     ├── Keyword
+  │     ├── Mood
+  │     ├── Date
+  │     ├── Tags
+  │     └── Results
+  │
+  ├── Future Messages
+  │     ├── Create Future Message
+  │     ├── Select Recipient
+  │     ├── Select Date
+  │     ├── Confirm with PIN
+  │     └── Scheduled List
+  │
+  └── Settings
+        ├── Privacy Lock
+        ├── Diary Locks
+        ├── Backup
+        ├── Voice Settings
+        ├── Mood Themes
+        ├── Reminders
+        ├── Export
+        └── Delete Data
+PREMIUM APP NAME IDEAS
+Best names
+1. Amanat Diary
+
+Meaning: something precious kept safely. Very emotional for Pakistan/Urdu audience.
+
+2. Dear Future
+
+Very global and clear. Best for international market.
+
+3. LifePages
+
+Simple and premium.
+
+4. MemoryVault
+
+Clear but slightly common.
+
+5. My Life Book
+
+Very easy to understand.
+
+6. EverPages
+
+Premium and timeless.
+
+7. SoulPages
+
+Emotional and beautiful.
+
+8. Dear Me
+
+Great for self-reflection.
+
+9. Letters Later
+
+Best if you focus more on future delivery.
+
+10. The Private Diary
+
+Very clear and trustworthy.
+
+My top 3:
+
+Dear Future — best global name
+Amanat Diary — best emotional South Asian name
+LifePages — best simple premium name
+
+BRAND DIRECTION
+Best brand positioning
+
+“A private diary where your voice becomes your life story.”
+
+Tagline options
+
+Your life, one beautiful page at a time.
+
+Speak today. Remember forever.
+
+A private home for your memories.
+
+Turn your thoughts into timeless pages.
+
+Write for today. Save for the future.
+
+Visual brand
+
+Use:
+
+cream background
+paper white cards
+soft brown text
+muted gold accent
+warm peach highlights
+soft blue/rose/green only for mood pages
+
+Avoid:
+
+black/dark UI
+neon colors
+purple AI app look
+too many gradients
+childish diary graphics
+My final recommendation
+
+Build it like this:
+
+No forced login.
+First app lock with PIN/biometric.
+Every diary can have its own password.
+Optional account only for backup, sync, and future delivery.
+
+This will feel much more private, premium, and trustworthy.
+
+Your main product line should be:
+
+“A real private diary where you can write, speak, turn pages, and keep memories safe for your future.”
