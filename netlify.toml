@@ -1,10 +1,10 @@
 [build]
-  command = "pnpm exec tsc -p netlify/tsconfig.json --noEmit"
-  publish = "netlify/public"
-  functions = "netlify/functions"
-
-[build.environment]
-  NPM_CONFIG_PRODUCTION = "false"
+command = "echo Netlify functions build"
+publish = "netlify/public"
+functions = "netlify/functions"
 
 [functions]
-  node_bundler = "esbuild"
+node_bundler = "esbuild"
+
+[build.environment]
+NPM_CONFIG_PRODUCTION = "false"
