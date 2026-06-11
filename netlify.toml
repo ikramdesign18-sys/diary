@@ -1,7 +1,0 @@
-[build]
-  command = "pnpm --filter @workspace/api-server run typecheck && pnpm exec tsc -p netlify/tsconfig.json --noEmit"
-  publish = "netlify/public"
-  functions = "netlify/functions"
-
-[functions]
-  node_bundler = "esbuild"
