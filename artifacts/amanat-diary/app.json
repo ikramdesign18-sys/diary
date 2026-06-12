@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "amanat-diary",
+    "scheme": "amanatdiary",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,9 +15,21 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.amanat.diary"
+      "bundleIdentifier": "com.amanat.diary",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID or fingerprint to unlock your private diary faster.",
+        "NSMicrophoneUsageDescription": "Amanat Diary uses your microphone to record private voice diary entries."
+      }
     },
     "android": {
+      "package": "com.amanatdiary.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FBF8F3"
@@ -34,11 +46,27 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-local-authentication",
+      "expo-sqlite",
+      "expo-notifications",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Amanat Diary uses your microphone to record private voice diary entries."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0f68cd13-3345-4838-b62c-6d9da1afdcb5"
+      }
+    },
+    "owner": "projuctnova0.2"
   }
 }
