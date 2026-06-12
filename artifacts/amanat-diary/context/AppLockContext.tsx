@@ -36,6 +36,8 @@ interface AppLockContextType {
   tryBiometric: () => Promise<boolean>;
   autoLockMinutes: number;
   setAutoLockMinutes: (minutes: number) => Promise<void>;
+  beginExternalActivity: () => void;
+  endExternalActivity: () => void;
 }
 
 const AppLockContext = createContext<AppLockContextType | null>(null);
@@ -50,6 +52,8 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [autoLockMinutes, setAutoLockMinutesState] = useState(5);
   const backgroundedAt = useRef<number | null>(null);
+  const externalActivityCount = useRef(0);
+  const externalActivityGraceUntil = useRef(0);
 
   useEffect(() => {
     const init = async () => {
@@ -85,6 +89,10 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", state => {
+      if (externalActivityCount.current > 0 || Date.now() < externalActivityGraceUntil.current) {
+        backgroundedAt.current = null;
+        return;
+      }
       if (state === "background" || state === "inactive") {
         backgroundedAt.current = Date.now();
         if (hasPin && autoLockMinutes === 0) setIsLocked(true);
@@ -167,12 +175,24 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
     setAutoLockMinutesState(minutes);
   }, []);
 
+  const beginExternalActivity = useCallback(() => {
+    externalActivityCount.current += 1;
+    backgroundedAt.current = null;
+  }, []);
+
+  const endExternalActivity = useCallback(() => {
+    externalActivityCount.current = Math.max(0, externalActivityCount.current - 1);
+    externalActivityGraceUntil.current = Date.now() + 1_500;
+    backgroundedAt.current = null;
+  }, []);
+
   return (
     <AppLockContext.Provider value={{
       initialized, hasPin, pinSetupComplete, pinLength, isLocked,
       setupPin, skipPinSetup, changePin, verifyPin, clearPin, unlock, lock,
       biometricAvailable, biometricEnabled, setBiometricEnabled, tryBiometric,
       autoLockMinutes, setAutoLockMinutes,
+      beginExternalActivity, endExternalActivity,
     }}>
       {children}
     </AppLockContext.Provider>

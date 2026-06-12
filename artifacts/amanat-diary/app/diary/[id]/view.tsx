@@ -23,7 +23,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
-import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
+import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
+import { PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { PinConfirmModal } from "@/components/PinConfirmModal";
 import { VoicePlayer } from "@/components/VoicePlayer";
@@ -106,6 +107,7 @@ function ReaderPage({
             <Text style={[styles.lockedHint, { color: accent }]}>Long press for private options</Text>
           </View>
         ) : <ScrollView contentContainerStyle={styles.paperContent} showsVerticalScrollIndicator={false}>
+          <PageStickerCanvas stickers={entry.stickers} accent={accent} />
           <View style={[
             styles.pageHeader,
             { borderBottomColor: accent + "35" },
@@ -138,7 +140,6 @@ function ReaderPage({
           {!entry.bodyPolished && !entry.body && !!entry.voiceTranscript && <Text style={[styles.body, { color: theme.textColor, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }, theme.typographyStyle === "letter" && styles.letterBody]}>{entry.voiceTranscript}</Text>}
           {!entry.bodyPolished && !entry.body && !entry.voiceTranscript && <Text style={[styles.body, { color: theme.secondaryTextColor }]}>A quiet page.</Text>}
 
-          <StickerStrip stickers={entry.stickers} accent={accent} />
           <FramedPhotos photos={entry.photos} frameKey={entry.photoFrameKey} accent={accent} />
 
           {!!entry.tags?.length && (
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   insetBorder: { ...StyleSheet.absoluteFillObject, margin: 11, borderWidth: 1, borderRadius: 3 },
   marginRule: { position: "absolute", top: 0, bottom: 0, left: 20, width: 1, opacity: 0.35 },
   pageDecoration: { position: "absolute", width: 150, height: 150, borderWidth: 1, borderRadius: 75, right: -75, top: -75 },
-  paperContent: { paddingHorizontal: 26, paddingTop: 24, paddingBottom: 34, minHeight: "100%" },
+  paperContent: { paddingHorizontal: 26, paddingTop: 24, paddingBottom: 34, minHeight: "100%", position: "relative" },
   pageHeader: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, paddingBottom: 14, marginBottom: 22 },
   chapterHeader: { justifyContent: "center", paddingTop: 8, borderBottomWidth: 0 },
   date: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.25 },

@@ -43,6 +43,22 @@ export const TEXT_STYLES: Array<{ key: PageTextStyleKey; label: string; size: nu
 export const STICKER_CATEGORIES = [...new Set(VECTOR_STICKERS.map(item => item.category))];
 export const STICKERS: PageSticker[] = VECTOR_STICKERS.map(item => ({ id: item.id, assetId: item.id, category: item.category }));
 
+export function createPlacedSticker(sticker: PageSticker, index: number): PageSticker {
+  const assetId = sticker.assetId ?? sticker.id;
+  return {
+    id: `${assetId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    assetId,
+    emoji: sticker.emoji,
+    category: sticker.category,
+    x: 18 + (index % 3) * 88,
+    y: 150 + Math.floor(index / 3) * 88,
+    width: 70,
+    height: 70,
+    rotation: 0,
+    zIndex: index + 1,
+  };
+}
+
 const backgroundAliases: Record<string, string> = {
   cream: "cream-blank", ruled: "cream-lined", pink: "soft-pink", blue: "soft-blue",
   gratitude: "gratitude-paper", love: "love-paper", travel: "travel-paper",

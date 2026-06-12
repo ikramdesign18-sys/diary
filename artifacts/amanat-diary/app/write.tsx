@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -18,16 +19,49 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MoodPicker } from "@/components/MoodPicker";
-import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
+import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
 import { PageCustomizationSheet } from "@/components/PageCustomizationSheet";
+import { PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { DEFAULT_THEME_ID, getDiaryTheme } from "@/constants/diaryThemes";
-import { getMoodStyleSuggestion, getPageBackground, getPageFont, getTextStyle, STICKERS } from "@/constants/pageCustomization";
+import { createPlacedSticker, getMoodStyleSuggestion, getPageBackground, getPageFont, getTextStyle, STICKERS } from "@/constants/pageCustomization";
+import { useAppLock } from "@/context/AppLockContext";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { detectThemeForEntry } from "@/services/themeDetectionService";
 import { activeEntryLock } from "@/lib/futureMemories";
 import type { Entry, Mood } from "@/types";
+
+type WriteCustomization = Pick<Entry, "fontKey" | "backgroundKey" | "stickers" | "photoFrameKey" | "textStyleKey">;
+interface WriteImageDraft {
+  diaryId: string;
+  entryId?: string;
+  title: string;
+  body: string;
+  mood: Mood;
+  photos: string[];
+  customization: WriteCustomization;
+  themeId: string;
+  autoTheme: boolean;
+  expiresAt: number;
+}
+
+const IMAGE_DRAFT_TTL = 2 * 60 * 60 * 1000;
+
+async function readWriteImageDraft(key: string) {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as WriteImageDraft;
+    if (!draft || draft.expiresAt <= Date.now()) {
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
 
 function formatDate() {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -39,6 +73,7 @@ function formatTime() {
 export default function WriteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { beginExternalActivity, endExternalActivity } = useAppLock();
   const { diaryId: paramDiaryId, entryId, returnTo } = useLocalSearchParams<{
     diaryId?: string;
     entryId?: string;
@@ -59,11 +94,14 @@ export default function WriteScreen() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [pickingImage, setPickingImage] = useState(false);
-  const [customization, setCustomization] = useState<Pick<Entry, "fontKey" | "backgroundKey" | "stickers" | "photoFrameKey" | "textStyleKey">>({
+  const [customization, setCustomization] = useState<WriteCustomization>({
     fontKey: "clean", backgroundKey: "theme", stickers: [], photoFrameKey: "rounded-classic", textStyleKey: "classic",
   });
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imageDraftRef = useRef<WriteImageDraft | null>(null);
+  const imageDraftSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const imageDraftKey = `@amanat/write_image_draft/${entryId ?? `new-${paramDiaryId ?? "default"}`}`;
 
   const theme = getDiaryTheme(themeId);
   const customBackground = getPageBackground(customization.backgroundKey);
@@ -72,36 +110,55 @@ export default function WriteScreen() {
   const pageBg = customization.backgroundKey === "theme" ? theme.paperColor : customBackground.paper;
   const accentColor = customization.backgroundKey === "theme" ? theme.accentColor : customBackground.accent;
   const selectedDiary = diaries.find(d => d.id === diaryId);
-  const hasContent = !!body.trim() || !!title.trim() || photos.length > 0;
+  const hasContent = !!body.trim() || !!title.trim() || photos.length > 0 || !!customization.stickers?.length;
 
   useEffect(() => {
     if (!diaryId && diaries.length > 0) setDiaryId(diaries[0].id);
   }, [diaries]);
 
+  const applyImageDraft = (draft: WriteImageDraft) => {
+    setDiaryId(draft.diaryId);
+    setTitle(draft.title);
+    setBody(draft.body);
+    setMood(draft.mood);
+    setPhotos(draft.photos);
+    setCustomization(draft.customization);
+    setThemeId(draft.themeId);
+    setAutoTheme(draft.autoTheme);
+    imageDraftRef.current = draft;
+  };
+
   useEffect(() => {
-    if (!paramDiaryId || !entryId) return;
-    getEntries(paramDiaryId).then(entries => {
-      const existing = entries.find(entry => entry.id === entryId);
-      if (!existing) return;
-      const lock = activeEntryLock(futureMessages, existing.id);
-      if (lock) {
-        Alert.alert("This memory is sealed", "Unlock it with your PIN from Diary View before editing.");
-        router.back();
-        return;
+    let cancelled = false;
+    const load = async () => {
+      if (paramDiaryId && entryId) {
+        const entries = await getEntries(paramDiaryId);
+        const existing = entries.find(entry => entry.id === entryId);
+        if (!existing || cancelled) return;
+        const lock = activeEntryLock(futureMessages, existing.id);
+        if (lock) {
+          Alert.alert("This memory is sealed", "Unlock it with your PIN from Diary View before editing.");
+          router.back();
+          return;
+        }
+        setDiaryId(existing.diaryId);
+        setTitle(existing.title);
+        setBody(existing.body);
+        setMood(existing.mood);
+        setPhotos(existing.photos ?? []);
+        setCustomization({
+          fontKey: existing.fontKey, backgroundKey: existing.backgroundKey, stickers: existing.stickers,
+          photoFrameKey: existing.photoFrameKey, textStyleKey: existing.textStyleKey,
+        });
+        setThemeId(existing.themeId ?? DEFAULT_THEME_ID);
+        setAutoTheme(!existing.userOverriddenTheme);
       }
-      setDiaryId(existing.diaryId);
-      setTitle(existing.title);
-      setBody(existing.body);
-      setMood(existing.mood);
-      setPhotos(existing.photos ?? []);
-      setCustomization({
-        fontKey: existing.fontKey, backgroundKey: existing.backgroundKey, stickers: existing.stickers,
-        photoFrameKey: existing.photoFrameKey, textStyleKey: existing.textStyleKey,
-      });
-      setThemeId(existing.themeId ?? DEFAULT_THEME_ID);
-      setAutoTheme(!existing.userOverriddenTheme);
-    });
-  }, [entryId, futureMessages, getEntries, paramDiaryId]);
+      const draft = await readWriteImageDraft(imageDraftKey);
+      if (!cancelled && draft) applyImageDraft(draft);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [entryId, futureMessages, getEntries, imageDraftKey, paramDiaryId]);
 
   useEffect(() => {
     if (body.length > 0 || title.length > 0) {
@@ -110,6 +167,36 @@ export default function WriteScreen() {
     }
     return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
   }, [body, title]);
+
+  useEffect(() => {
+    if (!imageDraftRef.current) return;
+    if (imageDraftSaveRef.current) clearTimeout(imageDraftSaveRef.current);
+    imageDraftSaveRef.current = setTimeout(() => {
+      const draft: WriteImageDraft = {
+        diaryId,
+        entryId,
+        title,
+        body,
+        mood,
+        photos,
+        customization,
+        themeId,
+        autoTheme,
+        expiresAt: Date.now() + IMAGE_DRAFT_TTL,
+      };
+      imageDraftRef.current = draft;
+      AsyncStorage.setItem(imageDraftKey, JSON.stringify(draft)).catch(() => {});
+    }, 250);
+    return () => {
+      if (imageDraftSaveRef.current) clearTimeout(imageDraftSaveRef.current);
+    };
+  }, [autoTheme, body, customization, diaryId, entryId, imageDraftKey, mood, photos, themeId, title]);
+
+  const clearImageDraft = async () => {
+    imageDraftRef.current = null;
+    if (imageDraftSaveRef.current) clearTimeout(imageDraftSaveRef.current);
+    await AsyncStorage.removeItem(imageDraftKey);
+  };
 
   const handleSave = async () => {
     if (!diaryId) {
@@ -136,6 +223,7 @@ export default function WriteScreen() {
         ...customization,
         ...(detection ? { tags: detection.tags } : {}),
       });
+      await clearImageDraft();
       router.back();
       return;
     }
@@ -156,6 +244,7 @@ export default function WriteScreen() {
       ...customization,
       date: new Date().toISOString(),
     });
+    await clearImageDraft();
     if (returnTo === "reader") {
       router.replace(`/diary/${diaryId}/view?entryId=${created.id}` as any);
     } else {
@@ -165,11 +254,27 @@ export default function WriteScreen() {
 
   const attachImage = async () => {
     if (pickingImage) return;
+    const draft: WriteImageDraft = {
+      diaryId,
+      entryId,
+      title,
+      body,
+      mood,
+      photos: [...photos],
+      customization,
+      themeId,
+      autoTheme,
+      expiresAt: Date.now() + IMAGE_DRAFT_TTL,
+    };
+    imageDraftRef.current = draft;
     setPickingImage(true);
+    beginExternalActivity();
     try {
+      await AsyncStorage.setItem(imageDraftKey, JSON.stringify(draft)).catch(() => {});
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      applyImageDraft(imageDraftRef.current ?? draft);
       if (!permission.granted) {
-        Alert.alert("Photo access needed", "Allow photo access to attach an image to this diary page.");
+        Alert.alert("Photo access needed", "Photo access is needed to attach an image.");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -177,6 +282,7 @@ export default function WriteScreen() {
         allowsMultipleSelection: false,
         quality: 0.9,
       });
+      applyImageDraft(imageDraftRef.current ?? draft);
       if (result.canceled || !result.assets?.[0]?.uri) return;
       const source = result.assets[0];
       let savedUri = source.uri;
@@ -187,17 +293,27 @@ export default function WriteScreen() {
         savedUri = `${folder}/image-${Date.now()}.${extension}`;
         await FileSystem.copyAsync({ from: source.uri, to: savedUri });
       }
-      setPhotos(current => [...current, savedUri]);
+      const updatedDraft = { ...draft, photos: [...draft.photos, savedUri], expiresAt: Date.now() + IMAGE_DRAFT_TTL };
+      applyImageDraft(updatedDraft);
+      await AsyncStorage.setItem(imageDraftKey, JSON.stringify(updatedDraft)).catch(() => {});
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
-      Alert.alert("Could not attach image", "Your writing is safe. Please try choosing the image again.");
+      applyImageDraft(imageDraftRef.current ?? draft);
+      Alert.alert("Image could not be added", "Image could not be added. Please try again.");
     } finally {
       setPickingImage(false);
+      endExternalActivity();
     }
   };
 
   const removeImage = (uri: string) => {
-    setPhotos(current => current.filter(photo => photo !== uri));
+    const nextPhotos = photos.filter(photo => photo !== uri);
+    setPhotos(nextPhotos);
+    if (imageDraftRef.current) {
+      const updatedDraft = { ...imageDraftRef.current, photos: nextPhotos, expiresAt: Date.now() + IMAGE_DRAFT_TTL };
+      imageDraftRef.current = updatedDraft;
+      AsyncStorage.setItem(imageDraftKey, JSON.stringify(updatedDraft)).catch(() => {});
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
@@ -219,7 +335,7 @@ export default function WriteScreen() {
       backgroundKey: suggestion.backgroundKey,
       photoFrameKey: suggestion.photoFrameKey,
       textStyleKey: suggestion.textStyleKey,
-      stickers: suggestedSticker ? [suggestedSticker] : [],
+      stickers: suggestedSticker ? [createPlacedSticker(suggestedSticker, 0)] : [],
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -273,6 +389,12 @@ export default function WriteScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <PageStickerCanvas
+            stickers={customization.stickers}
+            accent={accentColor}
+            editable
+            onChange={stickers => setCustomization(current => ({ ...current, stickers }))}
+          />
           {/* Page Header */}
           <View style={[styles.pageHeader, { borderBottomColor: colors.border + "40" }]}>
             <Text style={[styles.pageDate, { color: accentColor }]}>{formatDate()}</Text>
@@ -310,8 +432,6 @@ export default function WriteScreen() {
             textAlignVertical="top"
             autoFocus
           />
-
-          <StickerStrip stickers={customization.stickers} accent={accentColor} removable onRemove={id => setCustomization(current => ({ ...current, stickers: current.stickers?.filter(item => item.id !== id) }))} />
 
           {!!photos.length && (
             <View style={styles.attachments}>
@@ -404,7 +524,7 @@ const styles = StyleSheet.create({
   savedText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   saveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
   saveBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  page: { paddingHorizontal: 28, paddingTop: 4 },
+  page: { paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
   pageHeader: { paddingVertical: 16, borderBottomWidth: 1, marginBottom: 16 },
   pageDate: { fontSize: 13, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   pageTime: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },

@@ -13,6 +13,7 @@ import {
   STICKER_CATEGORIES,
   STICKERS,
   TEXT_STYLES,
+  createPlacedSticker,
   getPageBackground,
   getPhotoFrameKey,
 } from "@/constants/pageCustomization";
@@ -43,9 +44,9 @@ export function PageCustomizationSheet({
   const update = (next: Partial<Customization>) => onChange({ ...value, ...next });
   const selectedStickers = value.stickers ?? [];
 
-  const toggleSticker = (sticker: PageSticker) => {
-    const exists = selectedStickers.some(item => item.id === sticker.id);
-    update({ stickers: exists ? selectedStickers.filter(item => item.id !== sticker.id) : [...selectedStickers, sticker].slice(-8) });
+  const addSticker = (sticker: PageSticker) => {
+    if (selectedStickers.length >= 8) return;
+    update({ stickers: [...selectedStickers, createPlacedSticker(sticker, selectedStickers.length)] });
   };
 
   const tabs: Array<{ key: Tab; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
@@ -84,11 +85,10 @@ export function PageCustomizationSheet({
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
               {STICKER_CATEGORIES.map(category => <TouchableOpacity key={category} onPress={() => setStickerCategory(category)} style={[styles.category, { backgroundColor: stickerCategory === category ? colors.secondary : colors.card, borderColor: stickerCategory === category ? colors.primary : colors.border }]}><Text style={[styles.categoryText, { color: colors.foreground }]}>{category}</Text></TouchableOpacity>)}
             </ScrollView>
-            <Text style={[styles.stickerHint, { color: colors.mutedForeground }]}>Choose up to 8. Tap again to remove.</Text>
+            <Text style={[styles.stickerHint, { color: colors.mutedForeground }]}>Tap to place on the page. Move, resize, rotate, or remove it there. {selectedStickers.length}/8 placed.</Text>
             <View style={styles.stickerGrid}>{STICKERS.filter(item => item.category === stickerCategory).map(sticker => {
-              const selected = selectedStickers.some(item => item.id === sticker.id);
               const asset = getVectorAsset(sticker.assetId ?? sticker.id);
-              return <TouchableOpacity key={sticker.id} onPress={() => toggleSticker(sticker)} style={[styles.sticker, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}><AmanatSticker id={sticker.assetId ?? sticker.id} size={50} color={asset?.defaultColors.color} accent={asset?.defaultColors.accent} />{selected && <Feather name="check-circle" size={14} color={colors.primary} style={styles.stickerCheck} />}</TouchableOpacity>;
+              return <TouchableOpacity disabled={selectedStickers.length >= 8} key={sticker.id} onPress={() => addSticker(sticker)} style={[styles.sticker, { backgroundColor: colors.card, borderColor: colors.border, opacity: selectedStickers.length >= 8 ? 0.45 : 1 }]}><AmanatSticker id={sticker.assetId ?? sticker.id} size={50} color={asset?.defaultColors.color} accent={asset?.defaultColors.accent} /><Feather name="plus-circle" size={14} color={colors.primary} style={styles.stickerCheck} /></TouchableOpacity>;
             })}</View>
           </>}
         </ScrollView>

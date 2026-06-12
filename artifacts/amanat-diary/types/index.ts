@@ -75,6 +75,12 @@ export interface PageSticker {
   assetId?: string;
   emoji?: string;
   category: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  zIndex?: number;
 }
 
 export interface Diary {

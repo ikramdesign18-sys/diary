@@ -19,7 +19,8 @@ import { MOODS } from "@/constants/moods";
 import type { Entry } from "@/types";
 import { activeEntryLock } from "@/lib/futureMemories";
 import { VoicePlayer } from "@/components/VoicePlayer";
-import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
+import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
+import { PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { getDiaryTheme } from "@/constants/diaryThemes";
 import { getPageBackground, getPageFont, getTextStyle } from "@/constants/pageCustomization";
 
@@ -110,6 +111,7 @@ export default function EntryScreen() {
         contentContainerStyle={[styles.page, { paddingBottom: botPad + 32 }]}
         showsVerticalScrollIndicator={false}
       >
+        <PageStickerCanvas stickers={entry.stickers} accent={accent} />
         {/* Page Header */}
         <View style={[styles.pageHeader, { borderBottomColor: accent + "40" }]}>
           <Text style={[styles.pageDate, { color: accent }]}>{dateStr}</Text>
@@ -130,7 +132,6 @@ export default function EntryScreen() {
 
         <Text style={[styles.body, { color: colors.foreground, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }]}>{entry.bodyPolished || entry.body || entry.voiceTranscript || "No text written."}</Text>
 
-        <StickerStrip stickers={entry.stickers} accent={accent} />
         <FramedPhotos photos={entry.photos} frameKey={entry.photoFrameKey} accent={accent} />
 
         {entry.tags.length > 0 && (
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   diaryName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
   toolbarRight: { flexDirection: "row" },
-  page: { paddingHorizontal: 28, paddingTop: 4 },
+  page: { paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
   pageHeader: { paddingVertical: 18, borderBottomWidth: 1, marginBottom: 24, gap: 6 },
   pageDate: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
   pageHeaderRight: { flexDirection: "row", alignItems: "center", gap: 10 },

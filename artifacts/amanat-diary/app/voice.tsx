@@ -1,17 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  setIsAudioActiveAsync,
-  useAudioRecorder,
-  useAudioRecorderState,
-} from "expo-audio";
-import type { RecordingOptions } from "expo-audio";
+  Audio,
+  InterruptionModeAndroid,
+  InterruptionModeIOS,
+  type AudioMode,
+} from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,21 +23,47 @@ type Phase = "idle" | "recording" | "paused" | "processing" | "review";
 const languages: Array<[VoiceLanguage, string]> = [["auto", "Auto"], ["en", "English"], ["ur", "Urdu"], ["hi", "Hindi"], ["roman-ur", "Roman Urdu"]];
 const stylesList: Array<[PolishStyle, string]> = [["light", "Fix grammar"], ["diary", "Diary style"], ["concise", "Concise"]];
 const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
-const ANDROID_VOICE_PRESET: RecordingOptions = {
-  ...RecordingPresets.HIGH_QUALITY,
-  numberOfChannels: 1,
-  bitRate: 96000,
+const VOICE_RECORDING_OPTIONS: Audio.RecordingOptions = {
+  isMeteringEnabled: false,
   android: {
-    outputFormat: "mpeg4",
-    audioEncoder: "aac",
-    audioSource: "mic",
+    extension: ".m4a",
+    outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+    audioEncoder: Audio.AndroidAudioEncoder.AAC,
+    sampleRate: 44100,
+    numberOfChannels: 1,
+    bitRate: 128000,
   },
+  ios: {
+    ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+    extension: ".m4a",
+    sampleRate: 44100,
+    numberOfChannels: 1,
+    bitRate: 128000,
+  },
+  web: Audio.RecordingOptionsPresets.HIGH_QUALITY.web,
 };
-const recordingPreset = Platform.OS === "android" ? ANDROID_VOICE_PRESET : RecordingPresets.HIGH_QUALITY;
+const RECORDING_AUDIO_MODE: Partial<AudioMode> = {
+  allowsRecordingIOS: true,
+  playsInSilentModeIOS: true,
+  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+  interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+  shouldDuckAndroid: true,
+  playThroughEarpieceAndroid: false,
+  staysActiveInBackground: false,
+};
+const PLAYBACK_AUDIO_MODE: Partial<AudioMode> = {
+  allowsRecordingIOS: false,
+  playsInSilentModeIOS: true,
+  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+  interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+  shouldDuckAndroid: true,
+  playThroughEarpieceAndroid: false,
+  staysActiveInBackground: false,
+};
 
 function recordingError(stage: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  if (__DEV__) console.warn(`[voice-recording] ${stage} failed:`, message);
+  if (__DEV__) console.warn(`[voice-recording] ${stage} failed:`, error);
   return message;
 }
 
@@ -49,8 +72,7 @@ export default function VoiceScreen() {
   const insets = useSafeAreaInsets();
   const { diaryId: paramDiaryId } = useLocalSearchParams<{ diaryId?: string }>();
   const { diaries, createEntry } = useDiary();
-  const recorder = useAudioRecorder(recordingPreset);
-  const recorderState = useAudioRecorderState(recorder, 250);
+  const recordingRef = useRef<Audio.Recording | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [diaryId, setDiaryId] = useState(paramDiaryId ?? diaries[0]?.id ?? "");
   const [voiceUri, setVoiceUri] = useState<string>();
@@ -64,6 +86,7 @@ export default function VoiceScreen() {
   const [themeId, setThemeId] = useState<string>();
   const [statusMessage, setStatusMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [recordingDurationMillis, setRecordingDurationMillis] = useState(0);
   const topPad = Platform.OS === "web" ? 42 : insets.top;
   const botPad = Platform.OS === "web" ? 24 : insets.bottom;
 
@@ -83,9 +106,30 @@ export default function VoiceScreen() {
     return target;
   };
 
+  const validateRecordingFile = async (uri: string) => {
+    if (Platform.OS === "web") return;
+    const info = await FileSystem.getInfoAsync(uri);
+    if (!info.exists || !info.size) throw new Error("The finalized recording file is empty.");
+  };
+
   const deleteRecording = async (uri?: string | null) => {
     if (!uri || Platform.OS === "web") return;
     await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+  };
+
+  const cleanupActiveRecording = async (removeFile = false) => {
+    const recording = recordingRef.current;
+    recordingRef.current = null;
+    if (!recording) return;
+    const uri = recording.getURI();
+    recording.setOnRecordingStatusUpdate(null);
+    try {
+      const status = await recording.getStatusAsync();
+      if (status.canRecord) await recording.stopAndUnloadAsync();
+    } catch (error) {
+      recordingError("cleanup", error);
+    }
+    if (removeFile) await deleteRecording(uri);
   };
 
   const exitVoice = () => {
@@ -98,9 +142,8 @@ export default function VoiceScreen() {
         { text: "Keep Recording", style: "cancel" },
         {
           text: "Discard", style: "destructive", onPress: async () => {
-            await recorder.stop().catch(() => {});
-            await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
-            await deleteRecording(recorder.uri);
+            await cleanupActiveRecording(true);
+            await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
             router.back();
           },
         },
@@ -125,68 +168,106 @@ export default function VoiceScreen() {
     return () => subscription.remove();
   }, [phase, voiceUri]);
 
+  useEffect(() => () => {
+    const recording = recordingRef.current;
+    recordingRef.current = null;
+    recording?.setOnRecordingStatusUpdate(null);
+    recording?.stopAndUnloadAsync().catch(error => recordingError("unmount cleanup", error));
+  }, []);
+
   const startRecording = async () => {
-    if (phase === "recording" || recorderState.isRecording) {
+    if (phase === "recording" || phase === "paused" || recordingRef.current) {
       Alert.alert("Recording already active", "Stop the current recording before starting another.");
       return;
     }
     try {
-      const permission = await requestRecordingPermissionsAsync();
+      await cleanupActiveRecording(true);
+      const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         Alert.alert("Microphone permission needed", "Allow microphone access in Settings to record a voice memory.");
         return;
       }
-      try {
-        await setIsAudioActiveAsync(true);
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: "doNotMix" });
-      } catch (error) {
-        recordingError("audio mode", error);
-        throw new Error("The phone could not enable recording audio mode.");
-      }
-      try {
-        await recorder.prepareToRecordAsync();
-      } catch (error) {
-        recordingError("prepare", error);
-        throw new Error("The recorder could not be prepared on this device.");
-      }
-      try {
-        recorder.record();
-        await new Promise(resolve => setTimeout(resolve, 150));
-        if (!recorder.getStatus().isRecording) throw new Error("Recorder did not enter recording state");
-      } catch (error) {
-        recordingError("start", error);
-        throw new Error("The microphone was available, but recording could not start.");
-      }
+      await Audio.setAudioModeAsync(RECORDING_AUDIO_MODE);
+      const recording = new Audio.Recording();
+      recordingRef.current = recording;
+      setRecordingDurationMillis(0);
+      recording.setProgressUpdateInterval(250);
+      recording.setOnRecordingStatusUpdate(status => {
+        if (status.isRecording || status.canRecord) setRecordingDurationMillis(status.durationMillis);
+      });
+      await recording.prepareToRecordAsync(VOICE_RECORDING_OPTIONS);
+      const started = await recording.startAsync();
+      if (!started.isRecording) throw new Error("Recorder did not enter recording state.");
       setPhase("recording");
       setStatusMessage("");
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (error) {
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
-      Alert.alert("Unable to record", error instanceof Error ? error.message : "The microphone could not be started.");
+      recordingError("prepare/start", error);
+      await cleanupActiveRecording(true);
+      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
+      setPhase("idle");
+      Alert.alert("Unable to record", "Recording could not start on this device. Please try again.");
     }
   };
 
   const stopRecording = async () => {
+    const recording = recordingRef.current;
+    if (!recording) {
+      setPhase("idle");
+      return;
+    }
+    let savedUri: string;
+    let seconds = recordingDurationMillis / 1000;
     try {
-      const seconds = Math.max(recorder.currentTime, recorderState.durationMillis / 1000);
-      await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      if (!recorder.uri) throw new Error("Recording path unavailable");
-      const savedUri = await persistRecording(recorder.uri);
-      setVoiceUri(savedUri);
-      setDuration(seconds);
-      setPhase("processing");
-      setStatusMessage("Transcribing your voice…");
+      const finalStatus = await recording.stopAndUnloadAsync();
+      recording.setOnRecordingStatusUpdate(null);
+      recordingRef.current = null;
+      seconds = Math.max(seconds, finalStatus.durationMillis / 1000);
+      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+      const uri = recording.getURI();
+      if (!uri) throw new Error("Recording path unavailable after stop.");
+      savedUri = await persistRecording(uri);
+      await validateRecordingFile(savedUri);
+    } catch (error) {
+      recordingError("stop/save", error);
+      await cleanupActiveRecording(true);
+      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
+      setPhase("idle");
+      Alert.alert("Recording could not be saved", "The local audio file could not be finalized. Please record again.");
+      return;
+    }
+
+    setVoiceUri(savedUri);
+    setDuration(seconds);
+    setPhase("processing");
+    setStatusMessage("Transcribing your voice…");
+    try {
       const result = await transcribeVoice(savedUri, language);
       setTranscript(result.transcript);
       if (!result.transcript) setStatusMessage("We couldn’t transcribe automatically. Your recording is safe; you can type or paste the transcript.");
       else setStatusMessage("Auto-transcribed — you can edit before saving.");
-      setPhase("review");
     } catch (error) {
-      recordingError("stop/save", error);
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
-      setPhase("idle");
-      Alert.alert("Recording could not be saved", "The local audio file could not be finalized. Please record again.");
+      recordingError("transcription", error);
+      setStatusMessage("We couldn’t transcribe automatically. Your recording is safe; you can type or paste the transcript.");
+    } finally {
+      setPhase("review");
+    }
+  };
+
+  const togglePause = async () => {
+    const recording = recordingRef.current;
+    if (!recording) return;
+    try {
+      if (phase === "paused") {
+        await recording.startAsync();
+        setPhase("recording");
+      } else {
+        await recording.pauseAsync();
+        setPhase("paused");
+      }
+    } catch (error) {
+      recordingError("pause/resume", error);
+      Alert.alert("Recording is still safe", "Pause is unavailable on this device. You can continue recording or stop now.");
     }
   };
 
@@ -196,7 +277,7 @@ export default function VoiceScreen() {
       {
         text: "Discard", style: "destructive", onPress: async () => {
           await deleteRecording(voiceUri);
-          setVoiceUri(undefined); setDuration(0); setTranscript(""); setPolishedText(""); setTitle(""); setPhase("idle"); setStatusMessage("");
+          setVoiceUri(undefined); setDuration(0); setRecordingDurationMillis(0); setTranscript(""); setPolishedText(""); setTitle(""); setPhase("idle"); setStatusMessage("");
         },
       },
     ]);
@@ -271,10 +352,10 @@ export default function VoiceScreen() {
         {(phase === "idle" || phase === "recording" || phase === "paused") && (
           <View style={screen.recordArea}>
             <Text style={[screen.hint, { color: colors.mutedForeground }]}>{phase === "idle" ? "Your recording stays local unless Groq transcription is configured." : phase === "paused" ? "Recording paused" : "Recording… speak freely"}</Text>
-            <Text style={[screen.timer, { color: colors.foreground }]}>{formatTime(recorderState.durationMillis / 1000)}</Text>
+            <Text style={[screen.timer, { color: colors.foreground }]}>{formatTime(recordingDurationMillis / 1000)}</Text>
             <View style={screen.recordControls}>
               {phase === "idle" ? <TouchableOpacity onPress={startRecording} style={[screen.micBtn, { backgroundColor: colors.primary }]}><Feather name="mic" size={32} color={colors.primaryForeground} /></TouchableOpacity> : <>
-                {Platform.OS !== "android" && <TouchableOpacity onPress={() => { phase === "paused" ? recorder.record() : recorder.pause(); setPhase(phase === "paused" ? "recording" : "paused"); }} style={[screen.roundBtn, { borderColor: colors.border }]}><Feather name={phase === "paused" ? "play" : "pause"} size={21} color={colors.foreground} /></TouchableOpacity>}
+                {Platform.OS !== "android" && <TouchableOpacity onPress={togglePause} style={[screen.roundBtn, { borderColor: colors.border }]}><Feather name={phase === "paused" ? "play" : "pause"} size={21} color={colors.foreground} /></TouchableOpacity>}
                 <TouchableOpacity onPress={stopRecording} style={[screen.micBtn, { backgroundColor: colors.destructive }]}><Feather name="square" size={27} color="#FFFDF9" /></TouchableOpacity>
               </>}
             </View>
