@@ -27,11 +27,11 @@ export default function BackupPromptScreen() {
         Want to keep your diary safe if your phone is lost?
       </Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-        Your diary works fully without an account. Create one only if you want backup, sync, restore, or future delivery.
+        Your diary works fully without an account. Create one only if you want backup, sync, restore, or future cloud options.
       </Text>
 
       <View style={styles.feature}>
-        {["Cloud backup & restore", "Sync across devices", "Future message delivery", "Export & share"].map(f => (
+        {["Cloud backup & restore", "Sync across devices", "Local future reminders", "Export & share"].map(f => (
           <View key={f} style={styles.featureRow}>
             <Feather name="check" size={15} color="#5A8A6A" />
             <Text style={[styles.featureText, { color: colors.mutedForeground }]}>{f}</Text>
@@ -48,20 +48,13 @@ export default function BackupPromptScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          onPress={() => router.push("/auth/create-account")}
+          onPress={() => router.replace("/(onboarding)/create-diary")}
           style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
           activeOpacity={0.85}
         >
-          <Feather name="cloud" size={18} color={colors.primaryForeground} />
-          <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Enable Secure Backup</Text>
+          <Text style={[styles.primaryText, { color: colors.primaryForeground }]}>Continue Privately</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.replace("/(onboarding)/create-diary")}
-          style={[styles.secondaryBtn, { borderColor: colors.border }]}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.secondaryText, { color: colors.primary }]}>Continue Without Account</Text>
-        </TouchableOpacity>
+        <Text style={[styles.profileNote, { color: colors.mutedForeground }]}>You can create an optional backup account later from Profile.</Text>
       </View>
     </View>
   );
@@ -152,4 +145,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_500Medium",
   },
+  profileNote: { fontSize: 11, lineHeight: 16, fontFamily: "Inter_400Regular", textAlign: "center" },
 });

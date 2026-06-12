@@ -31,7 +31,7 @@ export default function LoginScreen() {
     setSaving(true);
     const result = await login(email.trim(), password);
     if (result.success) {
-      router.back();
+      router.replace((result.verificationRequired ? "/auth/verification" : "/(tabs)/profile") as any);
     } else {
       setError(result.error ?? "Login failed.");
       setSaving(false);
@@ -76,7 +76,7 @@ export default function LoginScreen() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push("/auth/forgot-password" as any)}>
         <Text style={[styles.link, { color: colors.mutedForeground }]}>Forgot password?</Text>
       </TouchableOpacity>
 

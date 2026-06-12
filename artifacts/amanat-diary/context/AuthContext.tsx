@@ -1,73 +1,125 @@
-import * as SecureStore from "expo-secure-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import * as Linking from "expo-linking";
 
+import { supabase, supabaseConfigured } from "@/lib/supabase";
 import type { BackupAccount } from "@/types";
 
-const AUTH_KEY = "amanat_auth";
-const AUTH_META_KEY = "@amanat/auth_meta";
+interface AuthResult {
+  success: boolean;
+  error?: string;
+  verificationRequired?: boolean;
+}
 
 interface AuthContextType {
   account: BackupAccount | null;
   isLoggedIn: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loading: boolean;
+  configured: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (email: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  resendVerification: () => Promise<void>;
+  resendVerification: () => Promise<AuthResult>;
+  resetPassword: (email: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const authRedirectUrl = Linking.createURL("auth/callback");
+
+function accountFromUser(user: { email?: string; email_confirmed_at?: string | null } | null): BackupAccount | null {
+  if (!user?.email) return null;
+  return { email: user.email, isVerified: !!user.email_confirmed_at };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [account, setAccount] = useState<BackupAccount | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const raw = await AsyncStorage.getItem(AUTH_META_KEY);
-        if (raw) setAccount(JSON.parse(raw));
-      } catch {}
-    };
-    load();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setAccount(accountFromUser(data.session?.user ?? null));
+      setLoading(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccount(accountFromUser(session?.user ?? null));
+    });
+    return () => data.subscription.unsubscribe();
   }, []);
 
-  const login = useCallback(async (email: string, _password: string) => {
-    // Simulated auth — in production this would call the real API
-    const acc: BackupAccount = { email, isVerified: false };
-    setAccount(acc);
-    await AsyncStorage.setItem(AUTH_META_KEY, JSON.stringify(acc));
-    await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify({ email }));
-    return { success: true };
+  const notConfigured = (): AuthResult => ({
+    success: false,
+    error: "Backup accounts are not configured yet. Your local diary is still available.",
+  });
+
+  const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    if (!supabase) return notConfigured();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (error.code === "email_not_confirmed") {
+        setAccount({ email, isVerified: false });
+        return { success: true, verificationRequired: true };
+      }
+      return { success: false, error: error.message };
+    }
+    setAccount(accountFromUser(data.user));
+    return { success: true, verificationRequired: !data.user.email_confirmed_at };
   }, []);
 
-  const register = useCallback(async (email: string, _password: string) => {
-    const acc: BackupAccount = { email, isVerified: false };
-    setAccount(acc);
-    await AsyncStorage.setItem(AUTH_META_KEY, JSON.stringify(acc));
-    await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify({ email }));
-    return { success: true };
+  const register = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    if (!supabase) return notConfigured();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: authRedirectUrl },
+    });
+    if (error) return { success: false, error: error.message };
+    setAccount(accountFromUser(data.user));
+    return { success: true, verificationRequired: !data.user?.email_confirmed_at };
   }, []);
 
   const logout = useCallback(async () => {
+    if (supabase) await supabase.auth.signOut();
     setAccount(null);
-    await AsyncStorage.removeItem(AUTH_META_KEY);
-    await SecureStore.deleteItemAsync(AUTH_KEY);
   }, []);
 
   const deleteAccount = useCallback(async () => {
+    // Account deletion requires a trusted server endpoint. Local diary data remains untouched.
     await logout();
   }, [logout]);
 
-  const resendVerification = useCallback(async () => {
-    // Would call backend in production
+  const resendVerification = useCallback(async (): Promise<AuthResult> => {
+    if (!supabase) return notConfigured();
+    if (!account?.email) return { success: false, error: "No account email is available." };
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: account.email,
+      options: { emailRedirectTo: authRedirectUrl },
+    });
+    return error ? { success: false, error: error.message } : { success: true, verificationRequired: true };
+  }, [account]);
+
+  const resetPassword = useCallback(async (email: string): Promise<AuthResult> => {
+    if (!supabase) return notConfigured();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectUrl });
+    return error ? { success: false, error: error.message } : { success: true };
   }, []);
 
   return (
     <AuthContext.Provider value={{
       account,
       isLoggedIn: !!account,
-      login, register, logout, deleteAccount, resendVerification,
+      loading,
+      configured: supabaseConfigured,
+      login,
+      register,
+      logout,
+      deleteAccount,
+      resendVerification,
+      resetPassword,
     }}>
       {children}
     </AuthContext.Provider>

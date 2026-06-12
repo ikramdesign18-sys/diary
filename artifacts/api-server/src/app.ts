@@ -5,6 +5,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+const corsOrigin = process.env.CORS_ORIGIN?.trim() || "*";
 
 app.use(
   pinoHttp({
@@ -25,8 +26,8 @@ app.use(
     },
   }),
 );
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: corsOrigin === "*" ? "*" : corsOrigin.split(",").map(origin => origin.trim()).filter(Boolean) }));
+app.use(express.json({ limit: "128kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

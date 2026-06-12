@@ -13,23 +13,98 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PinConfirmModal } from "@/components/PinConfirmModal";
 import { useDiary } from "@/context/DiaryContext";
 import { useAuth } from "@/context/AuthContext";
+import { useAppLock } from "@/context/AppLockContext";
 import { useColors } from "@/hooks/useColors";
-import type { Entry } from "@/types";
+import {
+  getSyncStatus,
+  pullRemoteChanges,
+  setLastSyncError,
+  setCloudSyncEnabled,
+  syncNow,
+  type CloudSyncStatus,
+} from "@/services/cloudSyncService";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaries, futureMessages, getAllEntries } = useDiary();
-  const { account, isLoggedIn, logout } = useAuth();
+  const { diaries, futureMessages, getAllEntries, reloadLocalData, databaseReady } = useDiary();
+  const { account, isLoggedIn, configured, logout, resendVerification } = useAuth();
+  const { hasPin } = useAppLock();
   const [totalEntries, setTotalEntries] = useState(0);
+  const [syncStatus, setSyncStatus] = useState<CloudSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [showFirstSyncPin, setShowFirstSyncPin] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
     getAllEntries().then(all => setTotalEntries(all.length));
   }, [diaries]);
+
+  const refreshSyncStatus = async () => setSyncStatus(await getSyncStatus());
+
+  useEffect(() => {
+    setSyncError("");
+    refreshSyncStatus().catch(() => {});
+  }, [account?.email, account?.isVerified, databaseReady]);
+
+  const runSync = async (mode: "sync" | "pull") => {
+    setSyncing(true);
+    setSyncError("");
+    try {
+      if (mode === "pull") {
+        const summary = await pullRemoteChanges();
+        await reloadLocalData();
+        Alert.alert("Cloud backup pulled", `${summary.pulled} records restored or updated. ${summary.skipped} newer local records kept.`);
+      } else {
+        const summary = await syncNow();
+        await reloadLocalData();
+        Alert.alert("Cloud sync complete", `${summary.pushed} records uploaded and ${summary.pulled} records restored or updated.`);
+      }
+    } catch (error) {
+      await setLastSyncError(error);
+      setSyncError(error instanceof Error ? error.message : "Cloud sync failed. Your local diary is safe.");
+    } finally {
+      setSyncing(false);
+      await refreshSyncStatus().catch(() => {});
+    }
+  };
+
+  const requestFirstSync = () => {
+    if (!account?.isVerified) {
+      Alert.alert("Verify your email", "Cloud sync starts only after you sign in and verify your email.");
+      return;
+    }
+    if (!hasPin) {
+      Alert.alert("Create a PIN first", "Cloud backup's first upload requires a PIN confirmation.", [
+        { text: "Not now", style: "cancel" },
+        { text: "Create PIN", onPress: () => router.push("/(onboarding)/pin-setup?returnTo=home" as any) },
+      ]);
+      return;
+    }
+    Alert.alert(
+      "Enable Cloud Backup?",
+      "First sync will upload your local diary data to your private account. Your diary will continue working offline first.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Continue", onPress: () => setShowFirstSyncPin(true) },
+      ],
+    );
+  };
+
+  const disableSync = () => {
+    Alert.alert("Disable Cloud Sync?", "This stops cloud sync on this device. Your local diary and existing cloud backup will not be deleted.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Disable", style: "destructive", onPress: async () => {
+        await setCloudSyncEnabled(false);
+        await refreshSyncStatus();
+      } },
+    ]);
+  };
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to log out?", [
@@ -92,7 +167,7 @@ export default function ProfileScreen() {
             <>
               <Text style={[styles.accountMode, { color: colors.foreground }]}>Local Mode</Text>
               <Text style={[styles.accountSub, { color: colors.mutedForeground }]}>
-                Your diary works privately on this device.{"\n"}Create a secure backup account only if you want cloud backup, restore, sync, or future delivery.
+                Your diary works privately on this device.{"\n"}Create a secure backup account only if you want cloud backup, restore, sync, or future cloud options.
               </Text>
             </>
           )}
@@ -116,18 +191,43 @@ export default function ProfileScreen() {
           </>
         ) : (
           <>
-            {!account?.isVerified && row("mail", "Resend Verification Email", () => {})}
-            {row("upload-cloud", "Sync Backup", () => {})}
+            {!account?.isVerified && row("mail", "Resend Verification Email", () => {
+              resendVerification().then(result => Alert.alert(result.success ? "Email sent" : "Unable to resend", result.success ? "Check your inbox for the verification link." : result.error));
+            })}
+            {account?.isVerified && syncStatus?.available && !syncStatus.enabled && row("upload-cloud", "Enable Cloud Backup", requestFirstSync)}
+            {account?.isVerified && syncStatus?.enabled && row("refresh-cw", syncing ? "Syncing..." : "Sync Now", () => { if (!syncing) runSync("sync"); })}
+            {account?.isVerified && syncStatus?.enabled && row("download-cloud", "Pull Cloud Backup", () => { if (!syncing) runSync("pull"); })}
+            {account?.isVerified && syncStatus?.enabled && row("cloud-off", "Disable Cloud Sync on This Device", disableSync)}
             {row("log-out", "Logout", handleLogout)}
           </>
         )}
       </View>
 
+      <View style={[styles.syncNote, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.syncTitle, { color: colors.foreground }]}>
+          {syncing ? "Syncing" : syncStatus?.message ?? "Local Mode"}
+        </Text>
+        <Text style={[styles.syncCopy, { color: colors.mutedForeground }]}>
+          Your diary works offline first. Cloud backup is optional. Cloud sync starts only after you sign in, verify your email, and enable it.
+        </Text>
+        {!!syncStatus?.lastSyncTime && (
+          <Text style={[styles.syncMeta, { color: colors.mutedForeground }]}>Last synced {new Date(syncStatus.lastSyncTime).toLocaleString()}</Text>
+        )}
+        {!!syncError && <Text style={[styles.syncError, { color: colors.destructive }]}>{syncError}</Text>}
+      </View>
+
+      {!configured && !isLoggedIn && (
+        <Text style={[styles.configNote, { color: colors.mutedForeground }]}>
+          Backup accounts are optional and not configured yet. Local Mode remains fully available.
+        </Text>
+      )}
+
       {/* Settings */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>APP</Text>
         {row("lock", "Privacy & Security", () => router.push("/settings/privacy"))}
-        {row("clock", "Future Messages", () => router.push("/future-messages"))}
+        {row("archive", "Backup & Export", () => router.push("/settings/backup-export" as any))}
+        {row("clock", "Future Letters & Reminders", () => router.push("/future-messages"))}
         {row("settings", "Settings", () => router.push("/settings"))}
       </View>
 
@@ -137,6 +237,23 @@ export default function ProfileScreen() {
           {row("trash-2", "Delete Account", () => {}, true)}
         </View>
       )}
+
+      <PinConfirmModal
+        visible={showFirstSyncPin}
+        title="Enable cloud backup?"
+        subtitle="Enter your PIN to confirm the first upload."
+        onCancel={() => setShowFirstSyncPin(false)}
+        onConfirmed={async () => {
+          setShowFirstSyncPin(false);
+          try {
+            await setCloudSyncEnabled(true);
+            await runSync("sync");
+          } catch (error) {
+            await setLastSyncError(error);
+            setSyncError(error instanceof Error ? error.message : "Cloud sync could not be enabled. Your local diary is safe.");
+          }
+        }}
+      />
     </ScrollView>
   );
 }
@@ -175,4 +292,10 @@ const styles = StyleSheet.create({
   },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   rowLabel: { fontSize: 15, fontFamily: "Inter_400Regular" },
+  configNote: { marginHorizontal: 30, marginTop: -8, marginBottom: 16, textAlign: "center", fontSize: 10, lineHeight: 15, fontFamily: "Inter_400Regular" },
+  syncNote: { marginHorizontal: 24, marginBottom: 16, borderWidth: 1, borderRadius: 16, padding: 16, gap: 6 },
+  syncTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  syncCopy: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular" },
+  syncMeta: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  syncError: { fontSize: 12, lineHeight: 17, fontFamily: "Inter_500Medium" },
 });

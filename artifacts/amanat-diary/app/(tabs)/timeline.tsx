@@ -18,11 +18,12 @@ import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { MOODS } from "@/constants/moods";
 import type { Entry, Mood } from "@/types";
+import { activeEntryLock } from "@/lib/futureMemories";
 
 export default function TimelineScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaries, getAllEntries } = useDiary();
+  const { diaries, futureMessages, getAllEntries } = useDiary();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [filterMood, setFilterMood] = useState<Mood | null>(null);
   const [filterDiary, setFilterDiary] = useState<string | null>(null);
@@ -79,8 +80,9 @@ export default function TimelineScreen() {
         renderItem={({ item }) => (
           <EntryCard
             entry={item}
+            lockedUntil={activeEntryLock(futureMessages, item.id)?.unlockDate ?? activeEntryLock(futureMessages, item.id)?.deliveryDate}
             diaryTitle={getDiaryTitle(item.diaryId)}
-            onPress={() => router.push(`/diary/${item.diaryId}/entry/${item.id}`)}
+            onPress={() => router.push(`/diary/${item.diaryId}/view?entryId=${item.id}` as any)}
           />
         )}
         ListEmptyComponent={() => (

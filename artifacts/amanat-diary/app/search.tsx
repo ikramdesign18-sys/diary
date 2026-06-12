@@ -17,31 +17,24 @@ import { EmptyState } from "@/components/EmptyState";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import type { Entry } from "@/types";
+import { activeEntryLock } from "@/lib/futureMemories";
 
 export default function SearchScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaries, getAllEntries } = useDiary();
+  const { diaries, futureMessages, searchEntries } = useDiary();
   const [query, setQuery] = useState("");
-  const [allEntries, setAllEntries] = useState<Entry[]>([]);
   const [results, setResults] = useState<Entry[]>([]);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
-    getAllEntries().then(setAllEntries);
-  }, []);
-
-  useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
-    const q = query.toLowerCase();
-    setResults(allEntries.filter(e =>
-      e.title?.toLowerCase().includes(q) ||
-      e.body?.toLowerCase().includes(q) ||
-      e.mood?.toLowerCase().includes(q) ||
-      e.tags?.some(t => t.toLowerCase().includes(q))
-    ));
-  }, [query, allEntries]);
+    const timeout = setTimeout(() => {
+      searchEntries(query).then(entries => setResults(entries.filter(entry => !activeEntryLock(futureMessages, entry.id))));
+    }, 120);
+    return () => clearTimeout(timeout);
+  }, [futureMessages, query, searchEntries]);
 
   const getDiaryTitle = (id: string) => diaries.find(d => d.id === id)?.title;
 
@@ -76,8 +69,12 @@ export default function SearchScreen() {
         renderItem={({ item }) => (
           <EntryCard
             entry={item}
+            lockedUntil={activeEntryLock(futureMessages, item.id)?.unlockDate ?? activeEntryLock(futureMessages, item.id)?.deliveryDate}
             diaryTitle={getDiaryTitle(item.diaryId)}
-            onPress={() => { router.back(); setTimeout(() => router.push(`/diary/${item.diaryId}/entry/${item.id}`), 100); }}
+            onPress={() => {
+              router.back();
+              setTimeout(() => router.push(`/diary/${item.diaryId}/view?entryId=${item.id}` as any), 100);
+            }}
           />
         )}
         ListEmptyComponent={() =>

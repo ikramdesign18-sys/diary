@@ -14,14 +14,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
-import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function CreateAccountScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
-  const { updateSettings } = useDiary();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -37,7 +35,7 @@ export default function CreateAccountScreen() {
     setSaving(true);
     const result = await register(email.trim(), password);
     if (result.success) {
-      router.back();
+      router.replace((result.verificationRequired ? "/auth/verification" : "/(tabs)/profile") as any);
     } else {
       setError(result.error ?? "Registration failed.");
       setSaving(false);
@@ -60,7 +58,7 @@ export default function CreateAccountScreen() {
         </View>
         <Text style={[styles.title, { color: colors.foreground }]}>Create Backup Account</Text>
         <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-          Your diary works without an account. This is only for backup, sync, restore, and future delivery.
+          Your diary works without an account. This is only for backup, sync, restore, and future cloud options.
         </Text>
 
         <View style={styles.form}>

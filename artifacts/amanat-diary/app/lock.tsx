@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -11,21 +12,26 @@ import { useColors } from "@/hooks/useColors";
 export default function LockScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { verifyPin, unlock, biometricAvailable, tryBiometric } = useAppLock();
+  const { verifyPin, unlock, pinLength, biometricAvailable, biometricEnabled, tryBiometric } = useAppLock();
   const [error, setError] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const finishUnlock = async () => {
+    unlock();
+    const pendingRoute = await AsyncStorage.getItem("@amanat/pending_notification_route");
+    if (pendingRoute) await AsyncStorage.removeItem("@amanat/pending_notification_route");
+    router.replace((pendingRoute || "/(tabs)") as any);
+  };
 
   useEffect(() => {
-    if (biometricAvailable) {
-      setTimeout(() => tryBiometric().then(ok => { if (ok) router.replace("/(tabs)"); }), 500);
+    if (biometricAvailable && biometricEnabled) {
+      setTimeout(() => tryBiometric().then(ok => { if (ok) finishUnlock(); }), 500);
     }
-  }, []);
+  }, [biometricAvailable, biometricEnabled, tryBiometric]);
 
   const handlePin = async (pin: string) => {
     const ok = await verifyPin(pin);
     if (ok) {
-      unlock();
-      router.replace("/(tabs)");
+      await finishUnlock();
     } else {
       setError(true);
       setAttempts(a => a + 1);
@@ -44,21 +50,25 @@ export default function LockScreen() {
       <View style={styles.pinWrap}>
         <PinInput
           onComplete={handlePin}
-          title="Enter your PIN"
+          length={pinLength}
+          title="Enter your diary PIN"
           subtitle={attempts > 0 ? "Incorrect PIN. Try again." : undefined}
           error={error}
         />
       </View>
 
-      {biometricAvailable && (
+      {biometricAvailable && biometricEnabled && (
         <TouchableOpacity
-          onPress={() => tryBiometric().then(ok => { if (ok) router.replace("/(tabs)"); })}
+          onPress={() => tryBiometric().then(ok => { if (ok) finishUnlock(); })}
           style={[styles.bioBtn, { borderColor: colors.border }]}
         >
           <Feather name="cpu" size={20} color={colors.primary} />
-          <Text style={[styles.bioText, { color: colors.primary }]}>Use Biometric</Text>
+          <Text style={[styles.bioText, { color: colors.primary }]}>Use Face ID / Fingerprint</Text>
         </TouchableOpacity>
       )}
+      <Text style={[styles.forgot, { color: colors.mutedForeground }]}>
+        For privacy, your PIN cannot be recovered. You can reset app data only.
+      </Text>
     </View>
   );
 }
@@ -104,4 +114,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_500Medium",
   },
+  forgot: { maxWidth: 310, marginTop: 8, paddingHorizontal: 20, textAlign: "center", fontSize: 11, lineHeight: 16, fontFamily: "Inter_400Regular" },
 });

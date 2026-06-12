@@ -34,6 +34,37 @@ export type Mood =
   | "Dreamy"
   | "Neutral";
 
+export type DiaryThemePattern = "plain" | "lines" | "notebook" | "dots" | "letter" | "postcard" | "chapter" | "floral" | "watermark";
+
+export interface DiaryTheme {
+  id: string;
+  name: string;
+  category: string;
+  moodTags: string[];
+  description: string;
+  backgroundColor: string;
+  paperColor: string;
+  textColor: string;
+  secondaryTextColor: string;
+  accentColor: string;
+  borderColor: string;
+  shadowColor: string;
+  patternType: DiaryThemePattern;
+  typographyStyle: "classic" | "modern" | "letter" | "poetry" | "academic" | "chapter";
+  headerStyle: "minimal" | "ruled" | "letter" | "chapter" | "planner";
+  decorationStyle: "none" | "corners" | "margin" | "stamp" | "seal" | "floral" | "halo";
+  lineStyle: "none" | "solid" | "dotted" | "notebook";
+}
+
+export interface ThemeDetectionResult {
+  mood: Mood;
+  tone: string;
+  themeId: string;
+  tags: string[];
+  confidence: number;
+  source: "groq" | "fallback";
+}
+
 export interface Diary {
   id: string;
   title: string;
@@ -58,12 +89,16 @@ export interface Entry {
   bodyPolished?: string;
   mood: Mood;
   tags: string[];
+  themeId?: string;
+  aiDetectedTheme?: string;
+  userOverriddenTheme?: boolean;
   isFavorite: boolean;
   isLocked: boolean;
   hasVoice: boolean;
   voiceUri?: string;
   voiceDuration?: number;
   voiceTranscript?: string;
+  voiceLanguage?: string;
   photos: string[];
   date: string;
   createdAt: string;
@@ -73,14 +108,23 @@ export interface Entry {
 export interface FutureMessage {
   id: string;
   entryId?: string;
+  diaryId?: string;
   title: string;
   body: string;
+  voiceNoteId?: string;
   recipientName: string;
   recipientEmail?: string;
   deliveryDate: string;
-  deliveryType: "text" | "voice" | "page" | "pdf";
-  status: "scheduled" | "delivered" | "failed" | "canceled";
+  deliveryType: "future-self" | "loved-one" | "unlock-later" | "reminder-only" | "text" | "voice" | "page" | "pdf";
+  status: "scheduled" | "unlocked" | "delivered" | "failed" | "canceled";
+  notificationId?: string;
+  unlockDate?: string;
+  emailDeliveryId?: string;
+  emailDeliveryStatus?: "scheduled" | "processing" | "delivered" | "failed" | "cancelled";
+  emailDeliveryMode?: "local" | "email" | "manual";
+  consentConfirmed?: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AppSettings {

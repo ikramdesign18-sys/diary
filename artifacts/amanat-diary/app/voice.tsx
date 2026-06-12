@@ -1,222 +1,335 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
 import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Animated,
-} from "react-native";
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
+import type { RecordingOptions } from "expo-audio";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Haptics from "expo-haptics";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Alert, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { VoicePlayer } from "@/components/VoicePlayer";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
+import { polishVoiceTranscript, transcribeVoice, type PolishStyle, type VoiceLanguage } from "@/services/voiceAIService";
+import { detectThemeForEntry } from "@/services/themeDetectionService";
 import type { Mood } from "@/types";
+
+type Phase = "idle" | "recording" | "paused" | "processing" | "review";
+const languages: Array<[VoiceLanguage, string]> = [["auto", "Auto"], ["en", "English"], ["ur", "Urdu"], ["hi", "Hindi"], ["roman-ur", "Roman Urdu"]];
+const stylesList: Array<[PolishStyle, string]> = [["light", "Fix grammar"], ["diary", "Diary style"], ["concise", "Concise"]];
+const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+const ANDROID_VOICE_PRESET: RecordingOptions = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1,
+  bitRate: 96000,
+  android: {
+    outputFormat: "mpeg4",
+    audioEncoder: "aac",
+    audioSource: "mic",
+  },
+};
+const recordingPreset = Platform.OS === "android" ? ANDROID_VOICE_PRESET : RecordingPresets.HIGH_QUALITY;
+
+function recordingError(stage: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (__DEV__) console.warn(`[voice-recording] ${stage} failed:`, message);
+  return message;
+}
 
 export default function VoiceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { diaryId: paramDiaryId } = useLocalSearchParams<{ diaryId?: string }>();
   const { diaries, createEntry } = useDiary();
-  const [isRecording, setIsRecording] = useState(false);
-  const [seconds, setSeconds] = useState(0);
+  const recorder = useAudioRecorder(recordingPreset);
+  const recorderState = useAudioRecorderState(recorder, 250);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [diaryId, setDiaryId] = useState(paramDiaryId ?? diaries[0]?.id ?? "");
+  const [voiceUri, setVoiceUri] = useState<string>();
+  const [duration, setDuration] = useState(0);
+  const [language, setLanguage] = useState<VoiceLanguage>("auto");
   const [transcript, setTranscript] = useState("");
-  const [suggestedTitle, setSuggestedTitle] = useState("");
-  const [detectedMood, setDetectedMood] = useState<Mood>("Neutral");
-  const [phase, setPhase] = useState<"idle" | "recording" | "review">("idle");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wave1 = useRef(new Animated.Value(1)).current;
-  const wave2 = useRef(new Animated.Value(1)).current;
-  const wave3 = useRef(new Animated.Value(1)).current;
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const botPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const [polishedText, setPolishedText] = useState("");
+  const [title, setTitle] = useState("");
+  const [mood, setMood] = useState<Mood>("Neutral");
+  const [tags, setTags] = useState<string[]>([]);
+  const [themeId, setThemeId] = useState<string>();
+  const [statusMessage, setStatusMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const topPad = Platform.OS === "web" ? 42 : insets.top;
+  const botPad = Platform.OS === "web" ? 24 : insets.bottom;
 
   useEffect(() => {
-    if (isRecording) {
-      const loop = (v: Animated.Value, delay: number) =>
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(delay),
-            Animated.timing(v, { toValue: 1.4, duration: 400, useNativeDriver: true }),
-            Animated.timing(v, { toValue: 1, duration: 400, useNativeDriver: true }),
-          ])
-        ).start();
-      loop(wave1, 0);
-      loop(wave2, 150);
-      loop(wave3, 300);
-      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    } else {
-      wave1.setValue(1); wave2.setValue(1); wave3.setValue(1);
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isRecording]);
+    if (diaries[0] && !diaries.some(diary => diary.id === diaryId)) setDiaryId(diaries[0].id);
+  }, [diaries, diaryId]);
 
-  const formatTime = (s: number) => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-
-  const handleRecord = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (!isRecording) {
-      setIsRecording(true);
-      setPhase("recording");
-      setSeconds(0);
-    } else {
-      setIsRecording(false);
-      setPhase("review");
-      setTranscript("Your voice entry will appear here after transcription. For now, type what you'd like to say or use your keyboard.");
-      setSuggestedTitle("Voice Entry — " + new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+  const persistRecording = async (uri: string) => {
+    if (!FileSystem.documentDirectory) return uri;
+    const folder = `${FileSystem.documentDirectory}voice-notes`;
+    await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
+    const target = `${folder}/voice-${Date.now()}.m4a`;
+    await FileSystem.copyAsync({ from: uri, to: target });
+    if (FileSystem.cacheDirectory && uri.startsWith(FileSystem.cacheDirectory)) {
+      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
     }
+    return target;
   };
 
-  const handleSave = async () => {
-    if (!diaries[0]) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await createEntry({
-      diaryId: diaries[0].id,
-      title: suggestedTitle,
-      body: transcript,
-      mood: detectedMood,
-      tags: [],
-      isFavorite: false,
-      isLocked: false,
-      hasVoice: true,
-      photos: [],
-      date: new Date().toISOString(),
-    });
+  const deleteRecording = async (uri?: string | null) => {
+    if (!uri || Platform.OS === "web") return;
+    await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+  };
+
+  const exitVoice = () => {
+    if (phase === "processing") {
+      Alert.alert("Please wait", "Your recording is still being prepared.");
+      return;
+    }
+    if (phase === "recording" || phase === "paused") {
+      Alert.alert("Discard active recording?", "Leaving now will stop and remove this unsaved recording.", [
+        { text: "Keep Recording", style: "cancel" },
+        {
+          text: "Discard", style: "destructive", onPress: async () => {
+            await recorder.stop().catch(() => {});
+            await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+            await deleteRecording(recorder.uri);
+            router.back();
+          },
+        },
+      ]);
+      return;
+    }
+    if (voiceUri) {
+      Alert.alert("Discard voice page?", "Leaving now will remove this unsaved local recording.", [
+        { text: "Keep Editing", style: "cancel" },
+        { text: "Discard", style: "destructive", onPress: async () => { await deleteRecording(voiceUri); router.back(); } },
+      ]);
+      return;
+    }
     router.back();
   };
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      exitVoice();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [phase, voiceUri]);
+
+  const startRecording = async () => {
+    if (phase === "recording" || recorderState.isRecording) {
+      Alert.alert("Recording already active", "Stop the current recording before starting another.");
+      return;
+    }
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Microphone permission needed", "Allow microphone access in Settings to record a voice memory.");
+        return;
+      }
+      try {
+        await setIsAudioActiveAsync(true);
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: "doNotMix" });
+      } catch (error) {
+        recordingError("audio mode", error);
+        throw new Error("The phone could not enable recording audio mode.");
+      }
+      try {
+        await recorder.prepareToRecordAsync();
+      } catch (error) {
+        recordingError("prepare", error);
+        throw new Error("The recorder could not be prepared on this device.");
+      }
+      try {
+        recorder.record();
+        await new Promise(resolve => setTimeout(resolve, 150));
+        if (!recorder.getStatus().isRecording) throw new Error("Recorder did not enter recording state");
+      } catch (error) {
+        recordingError("start", error);
+        throw new Error("The microphone was available, but recording could not start.");
+      }
+      setPhase("recording");
+      setStatusMessage("");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+      Alert.alert("Unable to record", error instanceof Error ? error.message : "The microphone could not be started.");
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      const seconds = Math.max(recorder.currentTime, recorderState.durationMillis / 1000);
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      if (!recorder.uri) throw new Error("Recording path unavailable");
+      const savedUri = await persistRecording(recorder.uri);
+      setVoiceUri(savedUri);
+      setDuration(seconds);
+      setPhase("processing");
+      setStatusMessage("Transcribing your recording…");
+      const result = await transcribeVoice(savedUri, language);
+      setTranscript(result.transcript);
+      if (!result.transcript) setStatusMessage("Automatic transcription is unavailable. Your recording is safe; type or paste a transcript below.");
+      else setStatusMessage("Transcript ready. Review it before saving.");
+      setPhase("review");
+    } catch (error) {
+      recordingError("stop/save", error);
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+      setPhase("idle");
+      Alert.alert("Recording could not be saved", "The local audio file could not be finalized. Please record again.");
+    }
+  };
+
+  const discard = () => {
+    Alert.alert("Discard recording?", "This removes the unsaved local recording.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Discard", style: "destructive", onPress: async () => {
+          await deleteRecording(voiceUri);
+          setVoiceUri(undefined); setDuration(0); setTranscript(""); setPolishedText(""); setTitle(""); setPhase("idle"); setStatusMessage("");
+        },
+      },
+    ]);
+  };
+
+  const polish = async (style: PolishStyle) => {
+    if (!transcript.trim()) return Alert.alert("Transcript needed", "Type or transcribe your voice memory first.");
+    setPhase("processing");
+    setStatusMessage("Polishing without changing your meaning…");
+    const result = await polishVoiceTranscript(transcript, style);
+    setPolishedText(result.polishedText);
+    setTitle(result.title);
+    setMood(result.mood);
+    setTags(result.tags);
+    setThemeId(result.themeId);
+    setStatusMessage(result.source === "groq" ? "Polished draft ready. Your original transcript is preserved." : "AI polish is unavailable. Your original transcript is preserved.");
+    setPhase("review");
+  };
+
+  const save = async () => {
+    if (!diaries.some(diary => diary.id === diaryId)) return Alert.alert("No diary selected", "Create or select a diary before saving.");
+    if (!voiceUri) return Alert.alert("No recording", "Record a voice memory first.");
+    setSaving(true);
+    try {
+      const detection = themeId ? null : await detectThemeForEntry({ transcript });
+      const fallbackTitle = transcript.trim().replace(/\s+/g, " ").split(" ").slice(0, 8).join(" ");
+      const created = await createEntry({
+        diaryId,
+        title: title.trim() || fallbackTitle || `Voice Memory · ${new Date().toLocaleDateString()}`,
+        body: transcript.trim(),
+        bodyPolished: polishedText.trim() || undefined,
+        mood: themeId ? mood : detection?.mood ?? mood,
+        tags: tags.length ? tags : detection?.tags ?? [],
+        themeId: themeId ?? detection?.themeId,
+        aiDetectedTheme: themeId ?? detection?.themeId,
+        userOverriddenTheme: false,
+        isFavorite: false,
+        isLocked: false,
+        hasVoice: true,
+        voiceUri,
+        voiceDuration: duration,
+        voiceTranscript: transcript.trim(),
+        voiceLanguage: language,
+        photos: [],
+        date: new Date().toISOString(),
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace(`/diary/${diaryId}/view?entryId=${created.id}` as any);
+    } catch {
+      Alert.alert("Could not save voice page", "Your recording remains on this device. Please try saving again.");
+      setSaving(false);
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-          <Feather name="x" size={22} color={colors.mutedForeground} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.foreground }]}>Voice Diary</Text>
-        <View style={{ width: 44 }} />
+    <View style={[screen.container, { backgroundColor: colors.background }]}>
+      <View style={[screen.header, { paddingTop: topPad + 8 }]}>
+        <TouchableOpacity onPress={exitVoice} style={screen.iconBtn}><Feather name="x" size={22} color={colors.foreground} /></TouchableOpacity>
+        <Text style={[screen.headerTitle, { color: colors.foreground }]}>Voice Diary</Text>
+        <View style={screen.iconBtn} />
       </View>
-
-      {phase !== "review" ? (
-        <View style={styles.recordArea}>
-          <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-            {phase === "idle" ? "Tap the mic to start recording" : "Recording... speak freely"}
-          </Text>
-
-          {/* Waveform */}
-          <View style={styles.waveWrap}>
-            {isRecording && (
-              <>
-                <Animated.View style={[styles.wave, { backgroundColor: colors.primary + "20", transform: [{ scale: wave1 }] }]} />
-                <Animated.View style={[styles.wave, styles.wave2, { backgroundColor: colors.primary + "15", transform: [{ scale: wave2 }] }]} />
-                <Animated.View style={[styles.wave, styles.wave3, { backgroundColor: colors.primary + "10", transform: [{ scale: wave3 }] }]} />
-              </>
-            )}
-            <TouchableOpacity
-              onPress={handleRecord}
-              style={[styles.micBtn, { backgroundColor: isRecording ? colors.destructive : colors.primary }]}
-              activeOpacity={0.85}
-            >
-              <Feather name={isRecording ? "square" : "mic"} size={32} color={colors.primaryForeground} />
-            </TouchableOpacity>
-          </View>
-
-          {isRecording && (
-            <Text style={[styles.timer, { color: colors.foreground }]}>{formatTime(seconds)}</Text>
-          )}
-          {!isRecording && seconds > 0 && (
-            <Text style={[styles.timer, { color: colors.mutedForeground }]}>Stopped</Text>
-          )}
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={[styles.review, { paddingBottom: botPad + 24 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={[styles.reviewCard, { backgroundColor: colors.moodCalm }]}>
-            <Text style={[styles.reviewLabel, { color: colors.mutedForeground }]}>AI SUGGESTED TITLE</Text>
-            <TextInput
-              value={suggestedTitle}
-              onChangeText={setSuggestedTitle}
-              style={[styles.reviewTitle, { color: colors.foreground }]}
-            />
-          </View>
-
-          <View style={styles.reviewSection}>
-            <Text style={[styles.reviewLabel, { color: colors.mutedForeground }]}>TRANSCRIPT</Text>
-            <TextInput
-              value={transcript}
-              onChangeText={setTranscript}
-              style={[styles.reviewBody, { color: colors.foreground, borderColor: colors.border }]}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={handleRecord}
-            style={[styles.reRecordBtn, { borderColor: colors.border }]}
-          >
-            <Feather name="refresh-cw" size={16} color={colors.mutedForeground} />
-            <Text style={[styles.reRecordText, { color: colors.mutedForeground }]}>Record Again</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleSave}
-            style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="save" size={18} color={colors.primaryForeground} />
-            <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save Voice Entry</Text>
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={[screen.content, { paddingBottom: botPad + 28 }]} keyboardShouldPersistTaps="handled">
+        <Text style={[screen.label, { color: colors.mutedForeground }]}>SAVE TO DIARY</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={screen.chips}>
+          {diaries.map(diary => <TouchableOpacity key={diary.id} onPress={() => setDiaryId(diary.id)} style={[screen.chip, { backgroundColor: diaryId === diary.id ? colors.primary : colors.card, borderColor: diaryId === diary.id ? colors.primary : colors.border }]}><Text style={[screen.chipText, { color: diaryId === diary.id ? colors.primaryForeground : colors.foreground }]}>{diary.title}</Text></TouchableOpacity>)}
         </ScrollView>
-      )}
+        <Text style={[screen.label, { color: colors.mutedForeground }]}>TRANSCRIPTION LANGUAGE</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={screen.chips}>
+          {languages.map(([value, label]) => <TouchableOpacity disabled={phase === "recording" || phase === "paused" || phase === "processing"} key={value} onPress={() => setLanguage(value)} style={[screen.chip, { backgroundColor: language === value ? colors.primary : colors.card, borderColor: language === value ? colors.primary : colors.border, opacity: phase === "recording" || phase === "paused" || phase === "processing" ? 0.65 : 1 }]}><Text style={[screen.chipText, { color: language === value ? colors.primaryForeground : colors.foreground }]}>{label}</Text></TouchableOpacity>)}
+        </ScrollView>
+
+        {(phase === "idle" || phase === "recording" || phase === "paused") && (
+          <View style={screen.recordArea}>
+            <Text style={[screen.hint, { color: colors.mutedForeground }]}>{phase === "idle" ? "Your recording stays local unless Groq transcription is configured." : phase === "paused" ? "Recording paused" : "Recording… speak freely"}</Text>
+            <Text style={[screen.timer, { color: colors.foreground }]}>{formatTime(recorderState.durationMillis / 1000)}</Text>
+            <View style={screen.recordControls}>
+              {phase === "idle" ? <TouchableOpacity onPress={startRecording} style={[screen.micBtn, { backgroundColor: colors.primary }]}><Feather name="mic" size={32} color={colors.primaryForeground} /></TouchableOpacity> : <>
+                {Platform.OS !== "android" && <TouchableOpacity onPress={() => { phase === "paused" ? recorder.record() : recorder.pause(); setPhase(phase === "paused" ? "recording" : "paused"); }} style={[screen.roundBtn, { borderColor: colors.border }]}><Feather name={phase === "paused" ? "play" : "pause"} size={21} color={colors.foreground} /></TouchableOpacity>}
+                <TouchableOpacity onPress={stopRecording} style={[screen.micBtn, { backgroundColor: colors.destructive }]}><Feather name="square" size={27} color="#FFFDF9" /></TouchableOpacity>
+              </>}
+            </View>
+          </View>
+        )}
+
+        {(phase === "processing" || phase === "review") && (
+          <View style={screen.review}>
+            {phase === "processing" && <View style={[screen.notice, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="loader" size={16} color={colors.primary} /><Text style={[screen.noticeText, { color: colors.foreground }]}>{statusMessage}</Text></View>}
+            {voiceUri && <VoicePlayer uri={voiceUri} duration={duration} accent={colors.primary} muted={colors.mutedForeground} />}
+            {!!statusMessage && phase === "review" && <Text style={[screen.status, { color: colors.mutedForeground }]}>{statusMessage}</Text>}
+
+            <Text style={[screen.label, { color: colors.mutedForeground }]}>ORIGINAL TRANSCRIPT</Text>
+            <TextInput value={transcript} onChangeText={setTranscript} placeholder="Type or edit the transcript…" placeholderTextColor={colors.mutedForeground} multiline textAlignVertical="top" style={[screen.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} />
+            <Text style={[screen.label, { color: colors.mutedForeground }]}>OPTIONAL POLISH</Text>
+            <View style={screen.polishRow}>{stylesList.map(([value, label]) => <TouchableOpacity disabled={phase === "processing"} key={value} onPress={() => polish(value)} style={[screen.polishBtn, { borderColor: colors.border }]}><Text style={[screen.polishText, { color: colors.foreground }]}>{label}</Text></TouchableOpacity>)}</View>
+            {!!polishedText && <><Text style={[screen.label, { color: colors.mutedForeground }]}>POLISHED DIARY TEXT</Text><TextInput value={polishedText} onChangeText={setPolishedText} multiline textAlignVertical="top" style={[screen.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]} /><TouchableOpacity onPress={() => setPolishedText("")}><Text style={[screen.keepOriginal, { color: colors.primary }]}>Keep original transcript as diary text</Text></TouchableOpacity></>}
+            <TextInput value={title} onChangeText={setTitle} placeholder="Title (auto-created when saved)" placeholderTextColor={colors.mutedForeground} style={[screen.titleInput, { color: colors.foreground, borderColor: colors.border }]} />
+            <View style={screen.actions}><TouchableOpacity onPress={discard} style={[screen.secondaryBtn, { borderColor: colors.border }]}><Text style={[screen.secondaryText, { color: colors.foreground }]}>Discard</Text></TouchableOpacity><TouchableOpacity disabled={saving || phase === "processing"} onPress={save} style={[screen.saveBtn, { backgroundColor: colors.primary, opacity: saving || phase === "processing" ? 0.5 : 1 }]}><Feather name="save" size={17} color={colors.primaryForeground} /><Text style={[screen.saveText, { color: colors.primaryForeground }]}>{saving ? "Saving…" : "Save Voice Page"}</Text></TouchableOpacity></View>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const screen = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingBottom: 16,
-  },
-  closeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  recordArea: { flex: 1, alignItems: "center", justifyContent: "center", gap: 32 },
-  hint: { fontSize: 16, fontFamily: "Inter_400Regular", textAlign: "center" },
-  waveWrap: { width: 180, height: 180, alignItems: "center", justifyContent: "center" },
-  wave: {
-    position: "absolute", width: 160, height: 160, borderRadius: 80,
-  },
-  wave2: { width: 130, height: 130, borderRadius: 65 },
-  wave3: { width: 100, height: 100, borderRadius: 50 },
-  micBtn: {
-    width: 80, height: 80, borderRadius: 40,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#2C1810", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, shadowRadius: 12, elevation: 6,
-  },
-  timer: { fontSize: 36, fontFamily: "Inter_700Bold", letterSpacing: -1 },
-  review: { padding: 24, gap: 20 },
-  reviewCard: { borderRadius: 16, padding: 16, gap: 8 },
-  reviewSection: { gap: 8 },
-  reviewLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
-  reviewTitle: { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  reviewBody: {
-    fontSize: 16, fontFamily: "Inter_400Regular", lineHeight: 24,
-    borderWidth: 1, borderRadius: 12, padding: 16, minHeight: 150,
-  },
-  reRecordBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, height: 48, borderRadius: 24, borderWidth: 1,
-  },
-  reRecordText: { fontSize: 15, fontFamily: "Inter_500Medium" },
-  saveBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, height: 56, borderRadius: 28,
-  },
-  saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingBottom: 8 },
+  iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  content: { paddingHorizontal: 20, gap: 12, flexGrow: 1 },
+  label: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 5 },
+  chips: { gap: 7, paddingRight: 12 },
+  chip: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 8 },
+  chipText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  recordArea: { flex: 1, minHeight: 430, alignItems: "center", justifyContent: "center", gap: 28 },
+  hint: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", maxWidth: 300, lineHeight: 21 },
+  timer: { fontSize: 40, fontFamily: "Inter_700Bold", letterSpacing: -1 },
+  recordControls: { flexDirection: "row", alignItems: "center", gap: 20 },
+  micBtn: { width: 82, height: 82, borderRadius: 41, alignItems: "center", justifyContent: "center" },
+  roundBtn: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  review: { gap: 13, marginTop: 8 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderRadius: 12, padding: 12 },
+  noticeText: { flex: 1, fontSize: 12, lineHeight: 18, fontFamily: "Inter_500Medium" },
+  status: { fontSize: 11, lineHeight: 17, fontFamily: "Inter_400Regular" },
+  input: { minHeight: 135, borderWidth: 1, borderRadius: 12, padding: 13, fontSize: 15, lineHeight: 23, fontFamily: "Inter_400Regular" },
+  titleInput: { height: 48, borderBottomWidth: 1, fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  polishRow: { flexDirection: "row", gap: 7 },
+  polishBtn: { flex: 1, borderWidth: 1, borderRadius: 18, alignItems: "center", paddingVertical: 9 },
+  polishText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  keepOriginal: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: -5 },
+  actions: { flexDirection: "row", gap: 9, marginTop: 8 },
+  secondaryBtn: { height: 52, borderWidth: 1, borderRadius: 26, paddingHorizontal: 20, alignItems: "center", justifyContent: "center" },
+  secondaryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  saveBtn: { flex: 1, height: 52, borderRadius: 26, flexDirection: "row", gap: 7, alignItems: "center", justifyContent: "center" },
+  saveText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

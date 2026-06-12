@@ -16,9 +16,12 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MoodPicker } from "@/components/MoodPicker";
+import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
+import { DEFAULT_THEME_ID, getDiaryTheme } from "@/constants/diaryThemes";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
-import { MOODS } from "@/constants/moods";
+import { detectThemeForEntry } from "@/services/themeDetectionService";
+import { activeEntryLock } from "@/lib/futureMemories";
 import type { Mood } from "@/types";
 
 function formatDate() {
@@ -31,26 +34,54 @@ function formatTime() {
 export default function WriteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaryId: paramDiaryId } = useLocalSearchParams<{ diaryId?: string }>();
-  const { diaries, createEntry } = useDiary();
+  const { diaryId: paramDiaryId, entryId, returnTo } = useLocalSearchParams<{
+    diaryId?: string;
+    entryId?: string;
+    returnTo?: string;
+  }>();
+  const { diaries, futureMessages, createEntry, getEntries, updateEntry } = useDiary();
   const [diaryId, setDiaryId] = useState(paramDiaryId ?? diaries[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [mood, setMood] = useState<Mood>("Neutral");
   const [moodPickerVisible, setMoodPickerVisible] = useState(false);
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
+  const [autoTheme, setAutoTheme] = useState(true);
+  const [detectingTheme, setDetectingTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const moodConfig = MOODS.find(m => m.label === mood);
-  const pageBg = moodConfig ? (colors as any)[moodConfig.bgKey] as string : colors.paper;
-  const accentColor = moodConfig ? (colors as any)[moodConfig.accentKey] as string : colors.mutedForeground;
+  const theme = getDiaryTheme(themeId);
+  const pageBg = theme.paperColor;
+  const accentColor = theme.accentColor;
   const selectedDiary = diaries.find(d => d.id === diaryId);
 
   useEffect(() => {
     if (!diaryId && diaries.length > 0) setDiaryId(diaries[0].id);
   }, [diaries]);
+
+  useEffect(() => {
+    if (!paramDiaryId || !entryId) return;
+    getEntries(paramDiaryId).then(entries => {
+      const existing = entries.find(entry => entry.id === entryId);
+      if (!existing) return;
+      const lock = activeEntryLock(futureMessages, existing.id);
+      if (lock) {
+        Alert.alert("This memory is sealed", "Unlock it with your PIN from Diary View before editing.");
+        router.back();
+        return;
+      }
+      setDiaryId(existing.diaryId);
+      setTitle(existing.title);
+      setBody(existing.body);
+      setMood(existing.mood);
+      setThemeId(existing.themeId ?? DEFAULT_THEME_ID);
+      setAutoTheme(!existing.userOverriddenTheme);
+    });
+  }, [entryId, futureMessages, getEntries, paramDiaryId]);
 
   useEffect(() => {
     if (body.length > 0 || title.length > 0) {
@@ -67,23 +98,66 @@ export default function WriteScreen() {
     }
     setSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await createEntry({
+    const detection = autoTheme
+      ? await detectThemeForEntry({ title: title.trim(), body: body.trim() })
+      : null;
+    const resolvedThemeId = detection?.themeId ?? themeId;
+    const resolvedMood = detection?.mood ?? mood;
+    const resolvedTags = detection?.tags ?? [];
+    if (entryId) {
+      await updateEntry(diaryId, entryId, {
+        title: title.trim(),
+        body: body.trim(),
+        mood: resolvedMood,
+        themeId: resolvedThemeId,
+        aiDetectedTheme: detection?.themeId,
+        userOverriddenTheme: !autoTheme,
+        ...(detection ? { tags: detection.tags } : {}),
+      });
+      router.back();
+      return;
+    }
+
+    const created = await createEntry({
       diaryId,
       title: title.trim(),
       body: body.trim(),
-      mood,
-      tags: [],
+      mood: resolvedMood,
+      tags: resolvedTags,
+      themeId: resolvedThemeId,
+      aiDetectedTheme: detection?.themeId,
+      userOverriddenTheme: !autoTheme,
       isFavorite: false,
       isLocked: false,
       hasVoice: false,
       photos: [],
       date: new Date().toISOString(),
     });
-    router.back();
+    if (returnTo === "reader") {
+      router.replace(`/diary/${diaryId}/view?entryId=${created.id}` as any);
+    } else {
+      router.back();
+    }
+  };
+
+  const handleAutoTheme = async () => {
+    setDetectingTheme(true);
+    setAutoTheme(true);
+    const detection = await detectThemeForEntry({ title, body });
+    setThemeId(detection.themeId);
+    setMood(detection.mood);
+    setDetectingTheme(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: pageBg }}>
+      {theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
+        <View pointerEvents="none" style={styles.editorLines}>
+          {Array.from({ length: 26 }).map((_, line) => <View key={line} style={[styles.editorLine, { backgroundColor: theme.borderColor }]} />)}
+        </View>
+      )}
+      {theme.decorationStyle === "margin" && <View pointerEvents="none" style={[styles.editorMargin, { backgroundColor: theme.accentColor }]} />}
       <KeyboardAvoidingView
         behavior="padding"
         style={{ flex: 1 }}
@@ -114,13 +188,13 @@ export default function WriteScreen() {
               disabled={saving || (!body.trim() && !title.trim())}
               style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: (!body.trim() && !title.trim()) ? 0.4 : 1 }]}
             >
-              <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save</Text>
+              <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>{entryId ? "Update" : "Save"}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.page, { paddingBottom: botPad + 100 }]}
+          contentContainerStyle={[styles.page, { paddingBottom: botPad + 150 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -130,12 +204,23 @@ export default function WriteScreen() {
             <Text style={[styles.pageTime, { color: colors.mutedForeground }]}>{formatTime()}</Text>
           </View>
 
+          <View style={[styles.themePreview, { backgroundColor: theme.backgroundColor, borderColor: theme.borderColor }]}>
+            <View style={[styles.themeSwatch, { backgroundColor: theme.paperColor, borderColor: theme.accentColor }]} />
+            <View style={{ flex: 1 }}>
+              <View style={styles.themeNameRow}>
+                <Text style={[styles.themeName, { color: theme.textColor }]}>{theme.name}</Text>
+                {autoTheme && <View style={[styles.autoPill, { backgroundColor: theme.accentColor + "18" }]}><Text style={[styles.autoPillText, { color: theme.accentColor }]}>AUTO THEME</Text></View>}
+              </View>
+              <Text style={[styles.themeDescription, { color: theme.secondaryTextColor }]} numberOfLines={1}>{theme.description}</Text>
+            </View>
+          </View>
+
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="Title (optional)"
             placeholderTextColor={colors.border}
-            style={[styles.titleInput, { color: colors.foreground }]}
+            style={[styles.titleInput, { color: theme.textColor }]}
             multiline
             maxLength={80}
           />
@@ -145,7 +230,7 @@ export default function WriteScreen() {
             onChangeText={setBody}
             placeholder="Write your thoughts here..."
             placeholderTextColor={colors.border}
-            style={[styles.bodyInput, { color: colors.foreground }]}
+            style={[styles.bodyInput, { color: theme.textColor }]}
             multiline
             textAlignVertical="top"
             autoFocus
@@ -158,7 +243,7 @@ export default function WriteScreen() {
             <Feather name="smile" size={20} color={accentColor} />
             <Text style={[styles.toolLabel, { color: accentColor }]}>{mood}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push("/voice")} style={styles.toolBtn}>
+          <TouchableOpacity onPress={() => router.push({ pathname: "/voice", params: { diaryId } })} style={styles.toolBtn}>
             <Feather name="mic" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.toolBtn}>
@@ -171,6 +256,16 @@ export default function WriteScreen() {
             <Feather name="lock" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
+        <View style={[styles.themeTools, { bottom: botPad + 60 }]}>
+          <TouchableOpacity onPress={handleAutoTheme} style={[styles.themeTool, { backgroundColor: theme.backgroundColor, borderColor: theme.borderColor }]}>
+            <Feather name="zap" size={15} color={theme.accentColor} />
+            <Text style={[styles.themeToolText, { color: theme.textColor }]}>{detectingTheme ? "Choosing…" : "Auto Theme"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setThemePickerVisible(true)} style={[styles.themeTool, { backgroundColor: theme.backgroundColor, borderColor: theme.borderColor }]}>
+            <Feather name="layers" size={15} color={theme.accentColor} />
+            <Text style={[styles.themeToolText, { color: theme.textColor }]}>Change Theme</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
       <MoodPicker
@@ -178,6 +273,17 @@ export default function WriteScreen() {
         current={mood}
         onSelect={m => { setMood(m); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         onClose={() => setMoodPickerVisible(false)}
+      />
+      <ThemeSelectorSheet
+        visible={themePickerVisible}
+        currentThemeId={themeId}
+        autoTheme={autoTheme}
+        onClose={() => setThemePickerVisible(false)}
+        onApply={selected => {
+          setThemeId(selected);
+          setAutoTheme(false);
+          setThemePickerVisible(false);
+        }}
       />
     </View>
   );
@@ -214,6 +320,19 @@ const styles = StyleSheet.create({
     fontSize: 17, fontFamily: "Inter_400Regular", lineHeight: 28,
     minHeight: 300,
   },
+  themePreview: { flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderRadius: 14, padding: 11, marginBottom: 18 },
+  themeSwatch: { width: 36, height: 42, borderRadius: 5, borderWidth: 1 },
+  themeNameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  themeName: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  themeDescription: { fontSize: 9, fontFamily: "Inter_400Regular", marginTop: 3 },
+  autoPill: { borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 },
+  autoPillText: { fontSize: 7, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
+  themeTools: { position: "absolute", left: 20, right: 20, flexDirection: "row", gap: 8 },
+  themeTool: { flex: 1, height: 40, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" },
+  themeToolText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  editorLines: { ...StyleSheet.absoluteFillObject, paddingTop: 190, gap: 28 },
+  editorLine: { height: 1, opacity: 0.42 },
+  editorMargin: { position: "absolute", top: 0, bottom: 0, left: 22, width: 1, opacity: 0.28 },
   toolbar: {
     flexDirection: "row", paddingHorizontal: 20, paddingTop: 10,
     borderTopWidth: 1, gap: 4,

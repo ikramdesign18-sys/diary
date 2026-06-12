@@ -18,6 +18,7 @@ import { EntryCard } from "@/components/EntryCard";
 import { EmptyState } from "@/components/EmptyState";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
+import { activeEntryLock } from "@/lib/futureMemories";
 import type { Entry } from "@/types";
 
 function greeting() {
@@ -34,7 +35,7 @@ function todayStr() {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaries, getEntries } = useDiary();
+  const { diaries, futureMessages, getEntries } = useDiary();
   const [recentEntries, setRecentEntries] = useState<Entry[]>([]);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -58,7 +59,7 @@ export default function HomeScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: botPad + 88 }}
+        contentContainerStyle={{ paddingBottom: botPad + 132 }}
       >
         {/* Header */}
         <View style={[styles.header, { paddingTop: topPad + 16 }]}>
@@ -147,18 +148,30 @@ export default function HomeScreen() {
                   key={entry.id}
                   entry={entry}
                   diaryTitle={getDiaryTitle(entry.diaryId)}
-                  onPress={() => router.push(`/diary/${entry.diaryId}/entry/${entry.id}`)}
+                  lockedUntil={activeEntryLock(futureMessages, entry.id)?.unlockDate}
+                  onPress={() => router.push(`/diary/${entry.diaryId}/view?entryId=${entry.id}` as any)}
                 />
               ))}
             </View>
           </View>
         )}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming Future Memories</Text>
+            <TouchableOpacity onPress={() => router.push("/future-messages")} style={[styles.addBtn, { backgroundColor: colors.secondary }]}><Feather name="arrow-right" size={16} color={colors.primary} /></TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={() => router.push("/future-messages")} style={[styles.futureCard, { backgroundColor: "#FFF7E9", borderColor: "#E5D2AF" }]}>
+            <View style={styles.futureSeal}><Feather name="mail" size={19} color="#FFF9EF" /></View>
+            <View style={{ flex: 1 }}><Text style={styles.futureTitle}>Future Letters</Text><Text style={styles.futureSub}>{futureMessages.filter(message => message.status === "scheduled").length ? `${futureMessages.filter(message => message.status === "scheduled").length} memories waiting for their day` : "Write a memory for your future self."}</Text></View>
+            <Feather name="chevron-right" size={18} color="#A47142" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* FAB */}
       <TouchableOpacity
         onPress={() => router.push("/write")}
-        style={[styles.fab, { backgroundColor: colors.primary, bottom: botPad + 80 }]}
+        style={[styles.fab, { backgroundColor: colors.primary, bottom: botPad + 82 }]}
         activeOpacity={0.85}
       >
         <Feather name="edit-3" size={24} color={colors.primaryForeground} />
@@ -173,21 +186,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingHorizontal: 24,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   greeting: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
   date: { fontSize: 14, fontFamily: "Inter_400Regular", marginTop: 3 },
-  searchBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  quickActions: { flexDirection: "row", gap: 10, paddingHorizontal: 24, marginBottom: 28 },
-  quickBtn: { flexDirection: "row", alignItems: "center", gap: 8, height: 50, borderRadius: 25, paddingHorizontal: 18 },
-  quickBtnPrimary: { flex: 1.2 },
-  quickText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  section: { paddingHorizontal: 24, marginBottom: 28 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.4 },
+  searchBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  quickActions: { flexDirection: "row", gap: 9, paddingHorizontal: 20, marginBottom: 22 },
+  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, height: 46, borderRadius: 16, paddingHorizontal: 12 },
+  quickBtnPrimary: { flex: 1 },
+  quickText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  section: { paddingHorizontal: 20, marginBottom: 24 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", letterSpacing: -0.35 },
   addBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  diaryList: { gap: 10 },
+  diaryList: { gap: 11 },
   emptyCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
   createDiaryBtn: {
     margin: 16, marginTop: 0, height: 46, borderRadius: 23,
@@ -199,12 +212,16 @@ const styles = StyleSheet.create({
     gap: 8, height: 54, borderRadius: 12, borderWidth: 1.5, borderStyle: "dashed",
   },
   newDiaryText: { fontSize: 15, fontFamily: "Inter_400Regular" },
-  entriesList: { gap: 10 },
+  entriesList: { gap: 11 },
   fab: {
-    position: "absolute", right: 24,
-    width: 56, height: 56, borderRadius: 28,
+    position: "absolute", right: 20,
+    width: 52, height: 52, borderRadius: 26,
     alignItems: "center", justifyContent: "center",
     shadowColor: "#2C1810", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2, shadowRadius: 12, elevation: 6,
   },
+  futureCard: { borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  futureSeal: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#B58A5B", alignItems: "center", justifyContent: "center" },
+  futureTitle: { color: "#594332", fontSize: 14, fontFamily: "Inter_700Bold" },
+  futureSub: { color: "#8A6847", fontSize: 10, marginTop: 3 },
 });

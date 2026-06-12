@@ -71,23 +71,23 @@ export function DiaryCard({ diary, onPress, onLongPress }: DiaryCardProps) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
-    height: 100,
+    height: 104,
     shadowColor: "#2C1810",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   spine: {
-    width: 8,
+    width: 7,
   },
   body: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
     justifyContent: "space-between",
   },
   top: {
@@ -118,13 +118,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   coverRight: {
-    width: 40,
-    paddingVertical: 12,
+    width: 44,
+    paddingVertical: 13,
     justifyContent: "space-around",
     alignItems: "center",
   },
   bindingLine: {
-    width: 20,
+    width: 23,
     height: 1.5,
     borderRadius: 1,
   },

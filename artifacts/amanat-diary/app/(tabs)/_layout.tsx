@@ -23,7 +23,8 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          height: isWeb ? 84 : 68,
+          height: isWeb ? 84 : 72,
+          paddingTop: isWeb ? 0 : 4,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -38,7 +39,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
           fontSize: 11,
-          marginBottom: isWeb ? 16 : 4,
+          marginBottom: isWeb ? 16 : 6,
         },
         tabBarIconStyle: { marginTop: isWeb ? 8 : 0 },
       }}

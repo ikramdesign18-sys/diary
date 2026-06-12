@@ -17,12 +17,14 @@ import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { MOODS } from "@/constants/moods";
 import type { Entry } from "@/types";
+import { activeEntryLock } from "@/lib/futureMemories";
+import { VoicePlayer } from "@/components/VoicePlayer";
 
 export default function EntryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id: diaryId, entryId } = useLocalSearchParams<{ id: string; entryId: string }>();
-  const { diaries, getEntries, updateEntry, deleteEntry } = useDiary();
+  const { diaries, futureMessages, getEntries, updateEntry, deleteEntry } = useDiary();
   const [entry, setEntry] = useState<Entry | null>(null);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -36,9 +38,14 @@ export default function EntryScreen() {
     if (!diaryId || !entryId) return;
     getEntries(diaryId).then(entries => {
       const found = entries.find(e => e.id === entryId);
-      if (found) setEntry(found);
+      if (!found) return;
+      if (activeEntryLock(futureMessages, found.id)) {
+        router.replace(`/diary/${diaryId}/view?entryId=${found.id}` as any);
+        return;
+      }
+      setEntry(found);
     });
-  }, [diaryId, entryId]);
+  }, [diaryId, entryId, futureMessages, getEntries]);
 
   if (!entry) {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
@@ -111,17 +118,9 @@ export default function EntryScreen() {
           <Text style={[styles.title, { color: colors.foreground }]}>{entry.title}</Text>
         ) : null}
 
-        {entry.hasVoice && (
-          <View style={[styles.voiceCard, { backgroundColor: accent + "15", borderColor: accent + "30" }]}>
-            <Feather name="mic" size={16} color={accent} />
-            <Text style={[styles.voiceText, { color: accent }]}>Voice recording attached</Text>
-            <TouchableOpacity style={[styles.playBtn, { backgroundColor: accent }]}>
-              <Feather name="play" size={14} color="#FFFDF9" />
-            </TouchableOpacity>
-          </View>
-        )}
+        {entry.hasVoice && <VoicePlayer uri={entry.voiceUri} duration={entry.voiceDuration} accent={accent} muted={colors.mutedForeground} />}
 
-        <Text style={[styles.body, { color: colors.foreground }]}>{entry.body || "No text written."}</Text>
+        <Text style={[styles.body, { color: colors.foreground }]}>{entry.bodyPolished || entry.body || "No text written."}</Text>
 
         {entry.tags.length > 0 && (
           <View style={styles.tags}>

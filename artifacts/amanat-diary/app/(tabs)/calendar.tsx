@@ -18,6 +18,7 @@ import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { MOODS } from "@/constants/moods";
 import type { Entry } from "@/types";
+import { activeEntryLock } from "@/lib/futureMemories";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -25,7 +26,7 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { diaries, getAllEntries } = useDiary();
+  const { diaries, futureMessages, getAllEntries } = useDiary();
   const [allEntries, setAllEntries] = useState<Entry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const now = new Date();
@@ -143,8 +144,9 @@ export default function CalendarScreen() {
                   <EntryCard
                     key={entry.id}
                     entry={entry}
+                    lockedUntil={activeEntryLock(futureMessages, entry.id)?.unlockDate ?? activeEntryLock(futureMessages, entry.id)?.deliveryDate}
                     diaryTitle={getDiaryTitle(entry.diaryId)}
-                    onPress={() => router.push(`/diary/${entry.diaryId}/entry/${entry.id}`)}
+                    onPress={() => router.push(`/diary/${entry.diaryId}/view?entryId=${entry.id}` as any)}
                   />
                 ))}
               </View>

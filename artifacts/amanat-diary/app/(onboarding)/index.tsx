@@ -45,7 +45,7 @@ const slides = [
   {
     icon: "clock" as const,
     title: "Keep memories safe\nfor the future.",
-    subtitle: "Lock your diary, back it up, and schedule selected memories for future delivery.",
+    subtitle: "Lock your diary, back it up, and schedule selected memories with local reminders.",
     color: "#C08070",
   },
 ];
