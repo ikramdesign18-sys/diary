@@ -44,7 +44,7 @@ export async function importBackupData(backup: BackupData) {
 
   const allowedColumns: Record<string, string[]> = {
     diaries: ["id","title","subtitle","category","coverStyle","accentColor","isLocked","defaultMood","entryCount","createdAt","updatedAt","deletedAt","syncStatus","lastSyncedAt"],
-    entries: ["id","diaryId","pageNumber","title","bodyOriginal","bodyPolished","mood","themeId","aiDetectedTheme","userOverriddenTheme","tagsJson","date","day","time","isFavorite","isLocked","hasVoice","hasMedia","voiceUri","voiceDuration","voiceTranscript","voiceLanguage","photosJson","createdAt","updatedAt","deletedAt","syncStatus","lastSyncedAt"],
+    entries: ["id","diaryId","pageNumber","title","bodyOriginal","bodyPolished","mood","themeId","aiDetectedTheme","userOverriddenTheme","tagsJson","date","day","time","isFavorite","isLocked","hasVoice","hasMedia","voiceUri","voiceDuration","voiceTranscript","voiceLanguage","photosJson","customizationJson","createdAt","updatedAt","deletedAt","syncStatus","lastSyncedAt"],
     voice_notes: ["id","entryId","localPath","duration","transcript","language","createdAt","updatedAt"],
     media: ["id","entryId","type","localPath","thumbnailPath","width","height","createdAt","updatedAt"],
     future_messages: ["id","entryId","diaryId","title","body","voiceNoteId","recipientName","recipientEmail","deliveryDate","deliveryType","status","notificationId","unlockDate","emailDeliveryId","emailDeliveryStatus","emailDeliveryMode","consentConfirmed","createdAt","updatedAt"],

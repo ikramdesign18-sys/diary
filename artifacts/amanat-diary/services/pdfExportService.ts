@@ -4,6 +4,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform, Share } from "react-native";
 
 import { getDiaryTheme } from "@/constants/diaryThemes";
+import { getPageBackground, getPageFont, getTextStyle } from "@/constants/pageCustomization";
 import { datedFileName } from "@/services/backupService";
 import type { Diary, Entry } from "@/types";
 
@@ -14,15 +15,22 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString("en-US"
 
 function pageHtml(entry: Entry, diary: Diary) {
   const theme = getDiaryTheme(entry.themeId);
+  const background = getPageBackground(entry.backgroundKey);
+  const font = getPageFont(entry.fontKey);
+  const textStyle = getTextStyle(entry.textStyleKey);
+  const paper = entry.backgroundKey && entry.backgroundKey !== "theme" ? background.paper : theme.paperColor;
+  const accent = entry.backgroundKey && entry.backgroundKey !== "theme" ? background.accent : theme.accentColor;
   const tags = entry.tags?.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join("") ?? "";
-  const media = entry.photos?.length ? `<div class="media">${entry.photos.map((_, index) => `Photo attachment ${index + 1}`).join(" · ")}</div>` : "";
-  return `<section class="page">
+  const stickers = entry.stickers?.length ? `<div class="stickers">${entry.stickers.map(() => `<span>✦</span>`).join("")}</div>` : "";
+  const media = entry.photos?.length ? `<div class="media">${entry.photos.map((_, index) => `Decorated photo attachment ${index + 1}`).join(" · ")} · ${escapeHtml(entry.photoFrameKey ?? "rounded")} frame</div>` : "";
+  const cssFont = font.body === "serif" ? "Georgia, serif" : font.body === "cursive" ? "cursive" : "Arial, sans-serif";
+  return `<section class="page" style="background:${paper};border-color:${accent};font-family:${cssFont}">
     <header><div><b>${escapeHtml(diary.title)}</b><small>${escapeHtml(formatDate(entry.date))}</small></div><span>Page ${entry.pageNumber}</span></header>
     <div class="eyebrow">${escapeHtml(entry.mood)} · ${escapeHtml(theme.name)}</div>
     <h1>${escapeHtml(entry.title || "Untitled page")}</h1>
-    <div class="body">${escapeHtml(entry.bodyPolished || entry.body || entry.voiceTranscript || "A quiet page.").replaceAll("\n", "<br>")}</div>
+    <div class="body" style="font-size:${textStyle.size}px;line-height:${textStyle.lineHeight / textStyle.size};text-align:${textStyle.align}">${escapeHtml(entry.bodyPolished || entry.body || entry.voiceTranscript || "A quiet page.").replaceAll("\n", "<br>")}</div>
     ${entry.hasVoice ? `<aside><b>Original voice memory</b><br>Voice recording attached.${entry.voiceTranscript ? `<br><br><b>Transcript</b><br>${escapeHtml(entry.voiceTranscript).replaceAll("\n", "<br>")}` : ""}</aside>` : ""}
-    ${media}<footer>${tags}</footer>
+    ${stickers}${media}<footer>${tags}</footer>
   </section>`;
 }
 
@@ -36,6 +44,7 @@ function styles() {
     h1 { font-size:30px; line-height:1.25; margin:16px 0 28px; } .body { font-size:16px; line-height:1.9; white-space:normal; }
     footer { margin-top:42px; border-top:1px solid #dfccb2; padding-top:16px; } .tag { display:inline-block; margin:0 8px 8px 0; color:#8a6847; font-size:11px; }
     aside,.media { margin-top:28px; padding:16px; background:#f5ead9; border-left:3px solid #b89169; font-size:12px; line-height:1.7; }
+    .stickers { display:flex; gap:10px; margin-top:24px; font-size:24px; }
     .cover,.final { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
     .cover h1 { font-size:44px; margin-bottom:10px; }.cover p { color:#8a6847; line-height:1.8; }.rule { width:80px; height:1px; background:#b89169; margin:22px; }
     .toc h1 { margin-bottom:36px; }.toc-row { display:flex; gap:16px; padding:11px 0; border-bottom:1px solid #eadbc5; font-size:12px; }.toc-row b { width:48px;color:#a47d55; }.toc-row span { flex:1; }

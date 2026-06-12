@@ -56,7 +56,8 @@
         {
           "microphonePermission": "Amanat Diary uses your microphone to record private voice diary entries."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -12,7 +12,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VoicePlayer } from "@/components/VoicePlayer";
@@ -176,11 +176,11 @@ export default function VoiceScreen() {
       setVoiceUri(savedUri);
       setDuration(seconds);
       setPhase("processing");
-      setStatusMessage("Transcribing your recording…");
+      setStatusMessage("Transcribing your voice…");
       const result = await transcribeVoice(savedUri, language);
       setTranscript(result.transcript);
-      if (!result.transcript) setStatusMessage("Automatic transcription is unavailable. Your recording is safe; type or paste a transcript below.");
-      else setStatusMessage("Transcript ready. Review it before saving.");
+      if (!result.transcript) setStatusMessage("We couldn’t transcribe automatically. Your recording is safe; you can type or paste the transcript.");
+      else setStatusMessage("Auto-transcribed — you can edit before saving.");
       setPhase("review");
     } catch (error) {
       recordingError("stop/save", error);
@@ -283,7 +283,7 @@ export default function VoiceScreen() {
 
         {(phase === "processing" || phase === "review") && (
           <View style={screen.review}>
-            {phase === "processing" && <View style={[screen.notice, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="loader" size={16} color={colors.primary} /><Text style={[screen.noticeText, { color: colors.foreground }]}>{statusMessage}</Text></View>}
+            {phase === "processing" && <View style={[screen.notice, { backgroundColor: colors.card, borderColor: colors.border }]}><ActivityIndicator size="small" color={colors.primary} /><Text style={[screen.noticeText, { color: colors.foreground }]}>{statusMessage}</Text></View>}
             {voiceUri && <VoicePlayer uri={voiceUri} duration={duration} accent={colors.primary} muted={colors.mutedForeground} />}
             {!!statusMessage && phase === "review" && <Text style={[screen.status, { color: colors.mutedForeground }]}>{statusMessage}</Text>}
 

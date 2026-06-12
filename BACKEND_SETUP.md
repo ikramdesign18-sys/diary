@@ -36,12 +36,12 @@ curl -X POST http://localhost:8080/api/ai/voice-polish \
   -d '{"transcript":"today i felt really happy and thankful","style":"beautiful_diary"}'
 ```
 
-Audio transcription is intentionally not accepting uploads yet:
+Audio transcription:
 
 ```bash
 curl -X POST http://localhost:8080/api/ai/transcribe-audio \
-  -H "Content-Type: application/json" \
-  -d '{}'
+  -F "language=auto" \
+  -F "audio=@/absolute/path/to/voice-memory.m4a"
 ```
 
 ## Environment Variables

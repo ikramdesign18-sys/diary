@@ -7,7 +7,7 @@ This deploys the Amanat Diary Groq proxy and optional automatic future-email del
 - `GET /api/healthz`
 - `POST /api/ai/theme-detect`
 - `POST /api/ai/voice-polish`
-- `POST /api/ai/transcribe-audio` returns the existing safe `501` placeholder
+- `POST /api/ai/transcribe-audio` transcribes a multipart audio upload with Groq Whisper
 - `POST /api/future-email/schedule`
 - `GET /api/future-email/list`
 - `POST /api/future-email/update`
@@ -86,8 +86,8 @@ curl -X POST http://localhost:8888/api/ai/voice-polish \
   -d '{"transcript":"today i completed my work and felt happy","style":"grammar_only"}'
 
 curl -X POST http://localhost:8888/api/ai/transcribe-audio \
-  -H "Content-Type: application/json" \
-  -d '{}'
+  -F "language=auto" \
+  -F "audio=@/absolute/path/to/voice-memory.m4a"
 ```
 
 ## Expo Configuration

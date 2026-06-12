@@ -1,14 +1,15 @@
+import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
-  Alert,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PinInput } from "@/components/PinInput";
 import { useAppLock } from "@/context/AppLockContext";
@@ -16,16 +17,12 @@ import { useColors } from "@/hooks/useColors";
 
 export default function PinSetupScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { setupPin, skipPinSetup, biometricAvailable, setBiometricEnabled } = useAppLock();
   const [step, setStep] = useState<"create" | "confirm">("create");
   const [length, setLength] = useState<4 | 6>(4);
   const [firstPin, setFirstPin] = useState("");
   const [error, setError] = useState(false);
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const botPad = Platform.OS === "web" ? 34 : insets.bottom;
-
   const handleFirst = (pin: string) => {
     setFirstPin(pin);
     setStep("confirm");
@@ -63,95 +60,123 @@ export default function PinSetupScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
-      <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
-        <Text style={styles.icon}>🔒</Text>
-      </View>
-      <Text style={[styles.heading, { color: colors.foreground }]}>Your diary is private.</Text>
-      <Text style={[styles.sub, { color: colors.mutedForeground }]}>Let's protect it with a PIN.</Text>
-
-      <View style={styles.pinWrap}>
-        {step === "create" && (
-          <View style={[styles.lengthPicker, { backgroundColor: colors.secondary }]}>
-            {[4, 6].map(option => (
-              <TouchableOpacity
-                key={option}
-                onPress={() => setLength(option as 4 | 6)}
-                style={[styles.lengthOption, { backgroundColor: length === option ? colors.card : "transparent" }]}
-              >
-                <Text style={[styles.lengthText, { color: length === option ? colors.primary : colors.mutedForeground }]}>{option}-digit</Text>
-              </TouchableOpacity>
-            ))}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
+            <Feather name="lock" size={23} color={colors.primary} />
           </View>
-        )}
-        {step === "create" ? (
-          <PinInput
-            onComplete={handleFirst}
-            length={length}
-            title="Create your PIN"
-            subtitle={`Choose a ${length}-digit PIN to lock the app`}
-          />
-        ) : (
-          <PinInput
-            onComplete={handleConfirm}
-            length={length}
-            title="Confirm your PIN"
-            subtitle="Enter the same PIN again"
-            error={error}
-          />
-        )}
-      </View>
+          <Text style={[styles.heading, { color: colors.foreground }]}>Your diary is private.</Text>
+          <Text style={[styles.sub, { color: colors.mutedForeground }]}>Create a PIN to protect your memories.</Text>
+        </View>
 
-      <Text style={[styles.privateNote, { color: colors.mutedForeground, paddingBottom: botPad + 16 }]}>
-        Your PIN is hashed and stored securely on this device.
-      </Text>
-      {returnTo !== "privacy" && step === "create" && (
-        <TouchableOpacity onPress={skip} style={[styles.skip, { borderColor: colors.border }]}>
-          <Text style={[styles.skipText, { color: colors.primary }]}>Skip for now</Text>
-          <Text style={[styles.skipNote, { color: colors.mutedForeground }]}>You can protect your diary later from Profile.</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+        <View style={styles.pinWrap}>
+          {step === "create" && (
+            <View style={[styles.lengthPicker, { backgroundColor: colors.secondary }]}>
+              {[4, 6].map(option => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => setLength(option as 4 | 6)}
+                  style={[styles.lengthOption, { backgroundColor: length === option ? colors.card : "transparent" }]}
+                >
+                  <Text style={[styles.lengthText, { color: length === option ? colors.primary : colors.mutedForeground }]}>{option}-digit</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {step === "create" ? (
+            <PinInput
+              compact
+              onComplete={handleFirst}
+              length={length}
+              title="Create your PIN"
+              subtitle={`Choose a ${length}-digit PIN to lock the app`}
+            />
+          ) : (
+            <PinInput
+              compact
+              onComplete={handleConfirm}
+              length={length}
+              title="Confirm your PIN"
+              subtitle="Enter the same PIN again"
+              error={error}
+            />
+          )}
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[styles.privateNote, { color: colors.mutedForeground }]}>
+            Your PIN is hashed and stored securely on this device.
+          </Text>
+          {returnTo !== "privacy" && step === "create" && (
+            <TouchableOpacity onPress={skip} style={[styles.skip, { borderColor: colors.border }]}>
+              <Text style={[styles.skipText, { color: colors.primary }]}>Skip for now</Text>
+              <Text style={[styles.skipNote, { color: colors.mutedForeground }]}>You can protect your diary later from Profile.</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: 430,
+    alignSelf: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 18,
+  },
+  header: {
     alignItems: "center",
-    gap: 12,
+    gap: 7,
   },
   iconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
+    width: 54,
+    height: 54,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 32,
-    marginBottom: 8,
+    marginBottom: 5,
   },
-  icon: { fontSize: 32 },
   heading: {
-    fontSize: 24,
+    fontSize: 23,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.5,
     textAlign: "center",
+    lineHeight: 29,
   },
   sub: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginBottom: 16,
     textAlign: "center",
+    lineHeight: 19,
   },
   pinWrap: {
-    flex: 1,
-    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 12,
   },
-  lengthPicker: { flexDirection: "row", alignSelf: "center", borderRadius: 18, padding: 3, marginBottom: 18 },
-  lengthOption: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 15 },
-  lengthText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  privateNote: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
-  skip: { marginBottom: 18, borderTopWidth: 1, paddingTop: 13, alignItems: "center", gap: 3 },
-  skipText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  skipNote: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  lengthPicker: { flexDirection: "row", alignSelf: "center", borderRadius: 17, padding: 3, marginBottom: 15 },
+  lengthOption: { minWidth: 76, alignItems: "center", paddingHorizontal: 13, paddingVertical: 6, borderRadius: 14 },
+  lengthText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  footer: {
+    alignItems: "center",
+    paddingTop: 12,
+    gap: 12,
+  },
+  privateNote: { maxWidth: 290, fontSize: 10, lineHeight: 15, fontFamily: "Inter_400Regular", textAlign: "center" },
+  skip: { width: "100%", borderTopWidth: 1, paddingTop: 11, paddingBottom: 2, alignItems: "center", gap: 4 },
+  skipText: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_600SemiBold" },
+  skipNote: { fontSize: 9, lineHeight: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
 });

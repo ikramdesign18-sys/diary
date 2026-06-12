@@ -6,6 +6,12 @@ export const intBool = (value?: number | null) => value === 1;
 export const jsonArray = (value?: string | null) => {
   try { return value ? JSON.parse(value) : []; } catch { return []; }
 };
+export const jsonObject = (value?: string | null) => {
+  try {
+    const parsed = value ? JSON.parse(value) : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch { return {}; }
+};
 
 export function normalizeEntry(entry: Entry, pageNumber = entry.pageNumber): Entry {
   return {
@@ -13,6 +19,11 @@ export function normalizeEntry(entry: Entry, pageNumber = entry.pageNumber): Ent
     pageNumber,
     tags: entry.tags ?? [],
     photos: entry.photos ?? [],
+    stickers: entry.stickers ?? [],
+    fontKey: entry.fontKey ?? "clean",
+    backgroundKey: entry.backgroundKey ?? "theme",
+    photoFrameKey: entry.photoFrameKey ?? "rounded-classic",
+    textStyleKey: entry.textStyleKey ?? "classic",
     themeId: entry.themeId ?? getThemeForMood(entry.mood).id,
     userOverriddenTheme: entry.userOverriddenTheme ?? false,
   };
@@ -28,6 +39,7 @@ export function diaryFromRow(row: any): Diary {
 }
 
 export function entryFromRow(row: any): Entry {
+  const customization = jsonObject(row.customizationJson);
   return normalizeEntry({
     id: row.id, diaryId: row.diaryId, pageNumber: row.pageNumber, title: row.title ?? "",
     body: row.bodyOriginal ?? "", bodyPolished: row.bodyPolished ?? undefined,
@@ -38,6 +50,9 @@ export function entryFromRow(row: any): Entry {
     voiceDuration: row.voiceDuration ?? undefined, voiceTranscript: row.voiceTranscript ?? undefined,
     voiceLanguage: row.voiceLanguage ?? undefined,
     photos: jsonArray(row.photosJson), date: row.date ?? row.createdAt,
+    fontKey: customization.fontKey, backgroundKey: customization.backgroundKey,
+    stickers: Array.isArray(customization.stickers) ? customization.stickers : [],
+    photoFrameKey: customization.photoFrameKey, textStyleKey: customization.textStyleKey,
     createdAt: row.createdAt, updatedAt: row.updatedAt,
   });
 }

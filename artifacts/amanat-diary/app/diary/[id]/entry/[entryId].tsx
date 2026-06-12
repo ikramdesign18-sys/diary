@@ -19,6 +19,9 @@ import { MOODS } from "@/constants/moods";
 import type { Entry } from "@/types";
 import { activeEntryLock } from "@/lib/futureMemories";
 import { VoicePlayer } from "@/components/VoicePlayer";
+import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
+import { getDiaryTheme } from "@/constants/diaryThemes";
+import { getPageBackground, getPageFont, getTextStyle } from "@/constants/pageCustomization";
 
 export default function EntryScreen() {
   const colors = useColors();
@@ -31,8 +34,12 @@ export default function EntryScreen() {
 
   const diary = diaries.find(d => d.id === diaryId);
   const moodConfig = entry ? MOODS.find(m => m.label === entry.mood) : null;
-  const pageBg = moodConfig ? (colors as any)[moodConfig.bgKey] as string : colors.paper;
-  const accent = moodConfig ? (colors as any)[moodConfig.accentKey] as string : colors.mutedForeground;
+  const theme = getDiaryTheme(entry?.themeId);
+  const customBackground = getPageBackground(entry?.backgroundKey);
+  const customFont = getPageFont(entry?.fontKey);
+  const customText = getTextStyle(entry?.textStyleKey);
+  const pageBg = entry?.backgroundKey && entry.backgroundKey !== "theme" ? customBackground.paper : moodConfig ? (colors as any)[moodConfig.bgKey] as string : theme.paperColor;
+  const accent = entry?.backgroundKey && entry.backgroundKey !== "theme" ? customBackground.accent : moodConfig ? (colors as any)[moodConfig.accentKey] as string : theme.accentColor;
 
   useEffect(() => {
     if (!diaryId || !entryId) return;
@@ -80,6 +87,7 @@ export default function EntryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: pageBg }]}>
+      {entry.backgroundKey && entry.backgroundKey !== "theme" && <PageBackgroundDecorations backgroundKey={entry.backgroundKey} accent={accent} />}
       {/* Toolbar */}
       <View style={[styles.toolbar, { paddingTop: topPad + 12, borderBottomColor: colors.border + "40" }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
@@ -115,12 +123,15 @@ export default function EntryScreen() {
         </View>
 
         {entry.title ? (
-          <Text style={[styles.title, { color: colors.foreground }]}>{entry.title}</Text>
+          <Text style={[styles.title, { color: colors.foreground, fontFamily: customFont.title }]}>{entry.title}</Text>
         ) : null}
 
         {entry.hasVoice && <VoicePlayer uri={entry.voiceUri} duration={entry.voiceDuration} accent={accent} muted={colors.mutedForeground} />}
 
-        <Text style={[styles.body, { color: colors.foreground }]}>{entry.bodyPolished || entry.body || "No text written."}</Text>
+        <Text style={[styles.body, { color: colors.foreground, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }]}>{entry.bodyPolished || entry.body || entry.voiceTranscript || "No text written."}</Text>
+
+        <StickerStrip stickers={entry.stickers} accent={accent} />
+        <FramedPhotos photos={entry.photos} frameKey={entry.photoFrameKey} accent={accent} />
 
         {entry.tags.length > 0 && (
           <View style={styles.tags}>

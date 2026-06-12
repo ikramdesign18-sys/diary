@@ -14,36 +14,42 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { AmanatIllustration } from "@/components/vector-assets/AmanatIllustration";
 
 const { width } = Dimensions.get("window");
 
 const slides = [
   {
     icon: "book-open" as const,
+    illustration: "write-first-memory",
     title: "Your private diary,\nbeautifully kept.",
     subtitle: "Write your thoughts, memories, and feelings in a space that feels truly yours.",
     color: "#C4A55A",
   },
   {
     icon: "mic" as const,
+    illustration: "voice-diary",
     title: "Speak, and your voice\nbecomes a page.",
     subtitle: "Record your thoughts and turn them into clean diary entries with voice transcription.",
     color: "#7090A0",
   },
   {
     icon: "layers" as const,
+    illustration: "diary-book-pages",
     title: "Create diaries for\nevery part of life.",
     subtitle: "Personal, school, work, dreams, gratitude, travel, and future letters.",
     color: "#709080",
   },
   {
     icon: "book" as const,
+    illustration: "photo-memories",
     title: "Relive memories\nlike a real book.",
     subtitle: "Open your diary and swipe through pages just like a real notebook.",
     color: "#A07890",
   },
   {
     icon: "clock" as const,
+    illustration: "safe-memories",
     title: "Keep memories safe\nfor the future.",
     subtitle: "Lock your diary, back it up, and schedule selected memories with local reminders.",
     color: "#C08070",
@@ -80,10 +86,8 @@ export default function OnboardingScreen() {
         keyExtractor={(_, i) => i.toString()}
         renderItem={({ item }) => (
           <View style={[styles.slide, { width }]}>
-            <View style={[styles.iconCircle, { backgroundColor: item.color + "18", borderColor: item.color + "30" }]}>
-              <View style={[styles.iconInner, { backgroundColor: item.color + "25" }]}>
-                <Feather name={item.icon} size={40} color={item.color} />
-              </View>
+            <View style={[styles.iconCircle, { backgroundColor: item.color + "10", borderColor: item.color + "25" }]}>
+              <AmanatIllustration id={item.illustration} width={210} color={colors.foreground} accent={item.color} />
             </View>
             <Text style={[styles.slideTitle, { color: colors.foreground }]}>{item.title}</Text>
             <Text style={[styles.slideSubtitle, { color: colors.mutedForeground }]}>{item.subtitle}</Text>
@@ -142,20 +146,13 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 230,
+    height: 170,
+    borderRadius: 42,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
-  },
-  iconInner: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: "center",
-    justifyContent: "center",
   },
   slideTitle: {
     fontSize: 28,

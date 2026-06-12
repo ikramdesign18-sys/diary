@@ -1,5 +1,7 @@
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -16,13 +18,16 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MoodPicker } from "@/components/MoodPicker";
+import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
+import { PageCustomizationSheet } from "@/components/PageCustomizationSheet";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { DEFAULT_THEME_ID, getDiaryTheme } from "@/constants/diaryThemes";
+import { getMoodStyleSuggestion, getPageBackground, getPageFont, getTextStyle, STICKERS } from "@/constants/pageCustomization";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { detectThemeForEntry } from "@/services/themeDetectionService";
 import { activeEntryLock } from "@/lib/futureMemories";
-import type { Mood } from "@/types";
+import type { Entry, Mood } from "@/types";
 
 function formatDate() {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -46,18 +51,28 @@ export default function WriteScreen() {
   const [mood, setMood] = useState<Mood>("Neutral");
   const [moodPickerVisible, setMoodPickerVisible] = useState(false);
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [customizationVisible, setCustomizationVisible] = useState(false);
   const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
   const [autoTheme, setAutoTheme] = useState(true);
   const [detectingTheme, setDetectingTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [pickingImage, setPickingImage] = useState(false);
+  const [customization, setCustomization] = useState<Pick<Entry, "fontKey" | "backgroundKey" | "stickers" | "photoFrameKey" | "textStyleKey">>({
+    fontKey: "clean", backgroundKey: "theme", stickers: [], photoFrameKey: "rounded-classic", textStyleKey: "classic",
+  });
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const theme = getDiaryTheme(themeId);
-  const pageBg = theme.paperColor;
-  const accentColor = theme.accentColor;
+  const customBackground = getPageBackground(customization.backgroundKey);
+  const customFont = getPageFont(customization.fontKey);
+  const customText = getTextStyle(customization.textStyleKey);
+  const pageBg = customization.backgroundKey === "theme" ? theme.paperColor : customBackground.paper;
+  const accentColor = customization.backgroundKey === "theme" ? theme.accentColor : customBackground.accent;
   const selectedDiary = diaries.find(d => d.id === diaryId);
+  const hasContent = !!body.trim() || !!title.trim() || photos.length > 0;
 
   useEffect(() => {
     if (!diaryId && diaries.length > 0) setDiaryId(diaries[0].id);
@@ -78,6 +93,11 @@ export default function WriteScreen() {
       setTitle(existing.title);
       setBody(existing.body);
       setMood(existing.mood);
+      setPhotos(existing.photos ?? []);
+      setCustomization({
+        fontKey: existing.fontKey, backgroundKey: existing.backgroundKey, stickers: existing.stickers,
+        photoFrameKey: existing.photoFrameKey, textStyleKey: existing.textStyleKey,
+      });
       setThemeId(existing.themeId ?? DEFAULT_THEME_ID);
       setAutoTheme(!existing.userOverriddenTheme);
     });
@@ -112,6 +132,8 @@ export default function WriteScreen() {
         themeId: resolvedThemeId,
         aiDetectedTheme: detection?.themeId,
         userOverriddenTheme: !autoTheme,
+        photos,
+        ...customization,
         ...(detection ? { tags: detection.tags } : {}),
       });
       router.back();
@@ -130,7 +152,8 @@ export default function WriteScreen() {
       isFavorite: false,
       isLocked: false,
       hasVoice: false,
-      photos: [],
+      photos,
+      ...customization,
       date: new Date().toISOString(),
     });
     if (returnTo === "reader") {
@@ -138,6 +161,44 @@ export default function WriteScreen() {
     } else {
       router.back();
     }
+  };
+
+  const attachImage = async () => {
+    if (pickingImage) return;
+    setPickingImage(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Photo access needed", "Allow photo access to attach an image to this diary page.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: false,
+        quality: 0.9,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      const source = result.assets[0];
+      let savedUri = source.uri;
+      if (FileSystem.documentDirectory && !source.uri.startsWith(FileSystem.documentDirectory)) {
+        const folder = `${FileSystem.documentDirectory}diary-images`;
+        await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
+        const extension = source.fileName?.split(".").pop()?.toLowerCase() || source.uri.split(".").pop()?.split("?")[0] || "jpg";
+        savedUri = `${folder}/image-${Date.now()}.${extension}`;
+        await FileSystem.copyAsync({ from: source.uri, to: savedUri });
+      }
+      setPhotos(current => [...current, savedUri]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      Alert.alert("Could not attach image", "Your writing is safe. Please try choosing the image again.");
+    } finally {
+      setPickingImage(false);
+    }
+  };
+
+  const removeImage = (uri: string) => {
+    setPhotos(current => current.filter(photo => photo !== uri));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleAutoTheme = async () => {
@@ -150,14 +211,28 @@ export default function WriteScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const applySuggestedStyle = () => {
+    const suggestion = getMoodStyleSuggestion(mood);
+    const suggestedSticker = STICKERS.find(item => item.category === suggestion.stickerCategory);
+    setCustomization({
+      fontKey: suggestion.fontKey,
+      backgroundKey: suggestion.backgroundKey,
+      photoFrameKey: suggestion.photoFrameKey,
+      textStyleKey: suggestion.textStyleKey,
+      stickers: suggestedSticker ? [suggestedSticker] : [],
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: pageBg }}>
-      {theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
+      {customization.backgroundKey !== "theme" && <PageBackgroundDecorations backgroundKey={customization.backgroundKey} accent={accentColor} />}
+      {customization.backgroundKey === "theme" && theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
         <View pointerEvents="none" style={styles.editorLines}>
           {Array.from({ length: 26 }).map((_, line) => <View key={line} style={[styles.editorLine, { backgroundColor: theme.borderColor }]} />)}
         </View>
       )}
-      {theme.decorationStyle === "margin" && <View pointerEvents="none" style={[styles.editorMargin, { backgroundColor: theme.accentColor }]} />}
+      {customization.backgroundKey === "theme" && theme.decorationStyle === "margin" && <View pointerEvents="none" style={[styles.editorMargin, { backgroundColor: theme.accentColor }]} />}
       <KeyboardAvoidingView
         behavior="padding"
         style={{ flex: 1 }}
@@ -185,8 +260,8 @@ export default function WriteScreen() {
             )}
             <TouchableOpacity
               onPress={handleSave}
-              disabled={saving || (!body.trim() && !title.trim())}
-              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: (!body.trim() && !title.trim()) ? 0.4 : 1 }]}
+              disabled={saving || !hasContent}
+              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving || !hasContent ? 0.4 : 1 }]}
             >
               <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>{entryId ? "Update" : "Save"}</Text>
             </TouchableOpacity>
@@ -220,7 +295,7 @@ export default function WriteScreen() {
             onChangeText={setTitle}
             placeholder="Title (optional)"
             placeholderTextColor={colors.border}
-            style={[styles.titleInput, { color: theme.textColor }]}
+            style={[styles.titleInput, { color: theme.textColor, fontFamily: customFont.title }]}
             multiline
             maxLength={80}
           />
@@ -230,30 +305,41 @@ export default function WriteScreen() {
             onChangeText={setBody}
             placeholder="Write your thoughts here..."
             placeholderTextColor={colors.border}
-            style={[styles.bodyInput, { color: theme.textColor }]}
+            style={[styles.bodyInput, { color: theme.textColor, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }]}
             multiline
             textAlignVertical="top"
             autoFocus
           />
+
+          <StickerStrip stickers={customization.stickers} accent={accentColor} removable onRemove={id => setCustomization(current => ({ ...current, stickers: current.stickers?.filter(item => item.id !== id) }))} />
+
+          {!!photos.length && (
+            <View style={styles.attachments}>
+              <Text style={[styles.attachmentLabel, { color: accentColor }]}>ATTACHED IMAGES</Text>
+              <View>
+                <FramedPhotos photos={photos} frameKey={customization.photoFrameKey} accent={accentColor} removable onRemove={removeImage} />
+              </View>
+            </View>
+          )}
         </ScrollView>
 
         {/* Bottom Toolbar */}
         <View style={[styles.toolbar, { backgroundColor: pageBg + "F0", borderTopColor: colors.border + "40", paddingBottom: botPad + 8 }]}>
-          <TouchableOpacity onPress={() => setMoodPickerVisible(true)} style={styles.toolBtn}>
+          <TouchableOpacity onPress={() => setMoodPickerVisible(true)} activeOpacity={0.65} style={styles.toolBtn}>
             <Feather name="smile" size={20} color={accentColor} />
             <Text style={[styles.toolLabel, { color: accentColor }]}>{mood}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push({ pathname: "/voice", params: { diaryId } })} style={styles.toolBtn}>
+          <TouchableOpacity onPress={() => router.push({ pathname: "/voice", params: { diaryId } })} activeOpacity={0.65} style={styles.toolBtn}>
             <Feather name="mic" size={20} color={colors.mutedForeground} />
+            <Text style={[styles.toolLabel, { color: colors.mutedForeground }]}>Voice</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.toolBtn}>
-            <Feather name="image" size={20} color={colors.mutedForeground} />
+          <TouchableOpacity onPress={attachImage} disabled={pickingImage} activeOpacity={0.65} style={[styles.toolBtn, pickingImage && styles.toolDisabled]}>
+            <Feather name="image" size={20} color={photos.length ? accentColor : colors.mutedForeground} />
+            <Text style={[styles.toolLabel, { color: photos.length ? accentColor : colors.mutedForeground }]}>{pickingImage ? "Opening…" : photos.length ? `Images (${photos.length})` : "Image"}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.toolBtn}>
-            <Feather name="tag" size={20} color={colors.mutedForeground} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.toolBtn}>
-            <Feather name="lock" size={20} color={colors.mutedForeground} />
+          <TouchableOpacity onPress={() => setCustomizationVisible(true)} activeOpacity={0.65} style={styles.toolBtn}>
+            <Feather name="sliders" size={20} color={accentColor} />
+            <Text style={[styles.toolLabel, { color: accentColor }]}>Style</Text>
           </TouchableOpacity>
         </View>
         <View style={[styles.themeTools, { bottom: botPad + 60 }]}>
@@ -261,9 +347,9 @@ export default function WriteScreen() {
             <Feather name="zap" size={15} color={theme.accentColor} />
             <Text style={[styles.themeToolText, { color: theme.textColor }]}>{detectingTheme ? "Choosing…" : "Auto Theme"}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setThemePickerVisible(true)} style={[styles.themeTool, { backgroundColor: theme.backgroundColor, borderColor: theme.borderColor }]}>
-            <Feather name="layers" size={15} color={theme.accentColor} />
-            <Text style={[styles.themeToolText, { color: theme.textColor }]}>Change Theme</Text>
+          <TouchableOpacity onPress={applySuggestedStyle} style={[styles.themeTool, { backgroundColor: theme.backgroundColor, borderColor: theme.borderColor }]}>
+            <Feather name="heart" size={15} color={theme.accentColor} />
+            <Text style={[styles.themeToolText, { color: theme.textColor }]}>Suggested Style</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -283,6 +369,16 @@ export default function WriteScreen() {
           setThemeId(selected);
           setAutoTheme(false);
           setThemePickerVisible(false);
+        }}
+      />
+      <PageCustomizationSheet
+        visible={customizationVisible}
+        value={customization}
+        onChange={setCustomization}
+        onClose={() => setCustomizationVisible(false)}
+        onOpenTheme={() => {
+          setCustomizationVisible(false);
+          setThemePickerVisible(true);
         }}
       />
     </View>
@@ -320,6 +416,8 @@ const styles = StyleSheet.create({
     fontSize: 17, fontFamily: "Inter_400Regular", lineHeight: 28,
     minHeight: 300,
   },
+  attachments: { gap: 9, marginTop: 20, marginBottom: 8 },
+  attachmentLabel: { fontSize: 9, letterSpacing: 0.9, fontFamily: "Inter_700Bold" },
   themePreview: { flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderRadius: 14, padding: 11, marginBottom: 18 },
   themeSwatch: { width: 36, height: 42, borderRadius: 5, borderWidth: 1 },
   themeNameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
@@ -341,5 +439,6 @@ const styles = StyleSheet.create({
     flex: 1, height: 44, alignItems: "center", justifyContent: "center",
     flexDirection: "row", gap: 4,
   },
+  toolDisabled: { opacity: 0.55 },
   toolLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
 });

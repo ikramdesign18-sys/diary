@@ -9,20 +9,21 @@ export async function upsertEntry(input: Entry) {
   const date = new Date(entry.date);
   await db.runAsync(
     `INSERT INTO entries (id,diaryId,pageNumber,title,bodyOriginal,bodyPolished,mood,themeId,aiDetectedTheme,userOverriddenTheme,
-     tagsJson,date,day,time,isFavorite,isLocked,hasVoice,hasMedia,voiceUri,voiceDuration,voiceTranscript,voiceLanguage,photosJson,createdAt,updatedAt,syncStatus)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'local')
+     tagsJson,date,day,time,isFavorite,isLocked,hasVoice,hasMedia,voiceUri,voiceDuration,voiceTranscript,voiceLanguage,photosJson,customizationJson,createdAt,updatedAt,syncStatus)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'local')
      ON CONFLICT(id) DO UPDATE SET diaryId=excluded.diaryId,pageNumber=excluded.pageNumber,title=excluded.title,
      bodyOriginal=excluded.bodyOriginal,bodyPolished=excluded.bodyPolished,mood=excluded.mood,themeId=excluded.themeId,
      aiDetectedTheme=excluded.aiDetectedTheme,userOverriddenTheme=excluded.userOverriddenTheme,tagsJson=excluded.tagsJson,
      date=excluded.date,day=excluded.day,time=excluded.time,isFavorite=excluded.isFavorite,isLocked=excluded.isLocked,
      hasVoice=excluded.hasVoice,hasMedia=excluded.hasMedia,voiceUri=excluded.voiceUri,voiceDuration=excluded.voiceDuration,
-     voiceTranscript=excluded.voiceTranscript,voiceLanguage=excluded.voiceLanguage,photosJson=excluded.photosJson,updatedAt=excluded.updatedAt,deletedAt=NULL,syncStatus='local'`,
+     voiceTranscript=excluded.voiceTranscript,voiceLanguage=excluded.voiceLanguage,photosJson=excluded.photosJson,customizationJson=excluded.customizationJson,updatedAt=excluded.updatedAt,deletedAt=NULL,syncStatus='local'`,
     entry.id, entry.diaryId, entry.pageNumber, entry.title, entry.body, entry.bodyPolished ?? null, entry.mood, entry.themeId ?? null,
     entry.aiDetectedTheme ?? null, boolInt(entry.userOverriddenTheme), JSON.stringify(entry.tags), entry.date,
     Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("en-US", { weekday: "long" }),
     Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
     boolInt(entry.isFavorite), boolInt(entry.isLocked), boolInt(entry.hasVoice), boolInt(entry.photos.length > 0),
     entry.voiceUri ?? null, entry.voiceDuration ?? null, entry.voiceTranscript ?? null, entry.voiceLanguage ?? null, JSON.stringify(entry.photos),
+    JSON.stringify({ fontKey: entry.fontKey, backgroundKey: entry.backgroundKey, stickers: entry.stickers, photoFrameKey: entry.photoFrameKey, textStyleKey: entry.textStyleKey }),
     entry.createdAt, entry.updatedAt,
   );
   if (entry.hasVoice) {

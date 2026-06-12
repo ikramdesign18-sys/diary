@@ -5,6 +5,7 @@ import type { Mood } from "@/types";
 
 export type VoiceLanguage = "auto" | "en" | "ur" | "hi" | "roman-ur";
 export type PolishStyle = "light" | "diary" | "concise";
+const apiBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
 
 export interface VoicePolishResult {
   polishedText: string;
@@ -21,14 +22,42 @@ const fallbackTitle = (text: string) => {
 };
 
 export async function transcribeVoice(uri: string, language: VoiceLanguage) {
+  if (!apiBaseUrl || !uri) return { transcript: "", source: "unavailable" as const };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 65_000);
   try {
-    const result = await postApiJson<{ transcript?: unknown; source?: unknown }>("/api/ai/transcribe-audio", {
-      language,
-      hasLocalAudio: !!uri,
-    }, 12_000);
-    return { transcript: typeof result?.transcript === "string" ? result.transcript.trim() : "", source: result?.source === "groq" ? "groq" as const : "unavailable" as const };
+    const extension = uri.toLowerCase().split("?")[0].split(".").pop();
+    const form = new FormData();
+    if (typeof window !== "undefined" && uri.startsWith("blob:")) {
+      const blob = await fetch(uri).then(response => response.blob());
+      const webm = blob.type.includes("webm");
+      form.append("audio", blob, webm ? "voice-memory.webm" : "voice-memory.m4a");
+    } else {
+      const webm = extension === "webm";
+      form.append("audio", {
+        uri,
+        name: webm ? "voice-memory.webm" : "voice-memory.m4a",
+        type: webm ? "audio/webm" : "audio/mp4",
+      } as unknown as Blob);
+    }
+    form.append("language", language);
+    const response = await fetch(`${apiBaseUrl}/api/ai/transcribe-audio`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: form,
+      signal: controller.signal,
+    });
+    if (!response.ok) return { transcript: "", source: "unavailable" as const };
+    const result = await response.json() as { transcript?: unknown; language?: unknown; source?: unknown };
+    return {
+      transcript: typeof result.transcript === "string" ? result.transcript.trim() : "",
+      language: typeof result.language === "string" ? result.language : undefined,
+      source: result.source === "groq" ? "groq" as const : "unavailable" as const,
+    };
   } catch {
     return { transcript: "", source: "unavailable" as const };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

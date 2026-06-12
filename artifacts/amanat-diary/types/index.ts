@@ -65,6 +65,18 @@ export interface ThemeDetectionResult {
   source: "groq" | "fallback";
 }
 
+export type PageFontKey = "clean" | "serif" | "handwriting" | "rounded" | "elegant";
+export type PageBackgroundKey = string;
+export type PhotoFrameKey = string;
+export type PageTextStyleKey = "classic" | "spacious" | "compact" | "centered";
+
+export interface PageSticker {
+  id: string;
+  assetId?: string;
+  emoji?: string;
+  category: string;
+}
+
 export interface Diary {
   id: string;
   title: string;
@@ -92,6 +104,11 @@ export interface Entry {
   themeId?: string;
   aiDetectedTheme?: string;
   userOverriddenTheme?: boolean;
+  fontKey?: PageFontKey;
+  backgroundKey?: PageBackgroundKey;
+  stickers?: PageSticker[];
+  photoFrameKey?: PhotoFrameKey;
+  textStyleKey?: PageTextStyleKey;
   isFavorite: boolean;
   isLocked: boolean;
   hasVoice: boolean;

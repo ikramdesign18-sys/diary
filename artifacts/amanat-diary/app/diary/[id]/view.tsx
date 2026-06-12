@@ -2,7 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
-import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
@@ -24,10 +23,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
+import { FramedPhotos, PageBackgroundDecorations, StickerStrip } from "@/components/PageCustomizationElements";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { PinConfirmModal } from "@/components/PinConfirmModal";
 import { VoicePlayer } from "@/components/VoicePlayer";
 import { getDiaryTheme } from "@/constants/diaryThemes";
+import { getPageBackground, getPageFont, getTextStyle } from "@/constants/pageCustomization";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { entryMatchesQuery, formatEntryShareText, shareEntry, sortEntriesByPage } from "@/lib/diary";
@@ -55,8 +56,11 @@ function ReaderPage({
 }) {
   const colors = useColors();
   const theme = getDiaryTheme(entry.themeId);
-  const paper = theme.paperColor;
-  const accent = theme.accentColor;
+  const customBackground = getPageBackground(entry.backgroundKey);
+  const customFont = getPageFont(entry.fontKey);
+  const customText = getTextStyle(entry.textStyleKey);
+  const paper = entry.backgroundKey && entry.backgroundKey !== "theme" ? customBackground.paper : theme.paperColor;
+  const accent = entry.backgroundKey && entry.backgroundKey !== "theme" ? customBackground.accent : theme.accentColor;
   const date = new Date(entry.date).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -67,7 +71,9 @@ function ReaderPage({
   return (
     <View style={{ width, flex: 1, paddingHorizontal: width > 700 ? 80 : 14, paddingVertical: controlsVisible ? 8 : 18 }}>
       <Pressable onPress={onToggleControls} onLongPress={onLongPress} delayLongPress={450} style={[styles.paper, { backgroundColor: paper }]}>
-        {theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
+        {entry.backgroundKey && entry.backgroundKey !== "theme"
+          ? <PageBackgroundDecorations backgroundKey={entry.backgroundKey} accent={accent} />
+          : theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
           <View pointerEvents="none" style={styles.pageLines}>
             {Array.from({ length: 24 }).map((_, line) => (
               <View
@@ -80,16 +86,16 @@ function ReaderPage({
             ))}
           </View>
         )}
-        {theme.patternType === "dots" && (
+        {(!entry.backgroundKey || entry.backgroundKey === "theme") && theme.patternType === "dots" && (
           <View pointerEvents="none" style={styles.dotGrid}>
             {Array.from({ length: 96 }).map((_, dot) => <View key={dot} style={[styles.pageDot, { backgroundColor: theme.borderColor }]} />)}
           </View>
         )}
-        {(theme.patternType === "letter" || theme.patternType === "postcard") && (
+        {(!entry.backgroundKey || entry.backgroundKey === "theme") && (theme.patternType === "letter" || theme.patternType === "postcard") && (
           <View pointerEvents="none" style={[styles.insetBorder, { borderColor: theme.borderColor, borderStyle: theme.patternType === "postcard" ? "dashed" : "solid" }]} />
         )}
-        {theme.decorationStyle === "margin" && <View pointerEvents="none" style={[styles.marginRule, { backgroundColor: accent }]} />}
-        {theme.decorationStyle !== "none" && (
+        {(!entry.backgroundKey || entry.backgroundKey === "theme") && theme.decorationStyle === "margin" && <View pointerEvents="none" style={[styles.marginRule, { backgroundColor: accent }]} />}
+        {(!entry.backgroundKey || entry.backgroundKey === "theme") && theme.decorationStyle !== "none" && (
           <View pointerEvents="none" style={[styles.pageDecoration, { borderColor: accent, opacity: theme.decorationStyle === "halo" ? 0.12 : 0.2 }]} />
         )}
         {lockedUntil ? (
@@ -122,20 +128,18 @@ function ReaderPage({
               theme.typographyStyle === "poetry" && styles.poetryTitle,
               theme.typographyStyle === "chapter" && styles.chapterTitle,
               theme.typographyStyle === "letter" && styles.letterTitle,
+              { fontFamily: customFont.title },
             ]}>{entry.title}</Text>
           )}
 
           {entry.hasVoice && <VoicePlayer uri={entry.voiceUri} duration={entry.voiceDuration} accent={accent} muted={theme.secondaryTextColor} />}
 
-          {!!(entry.bodyPolished || entry.body) && <Text style={[styles.body, { color: theme.textColor }, theme.typographyStyle === "letter" && styles.letterBody, theme.typographyStyle === "academic" && styles.academicBody]}>{entry.bodyPolished || entry.body}</Text>}
-          {!entry.bodyPolished && !entry.body && !!entry.voiceTranscript && <Text style={[styles.body, { color: theme.textColor }, theme.typographyStyle === "letter" && styles.letterBody]}>{entry.voiceTranscript}</Text>}
+          {!!(entry.bodyPolished || entry.body) && <Text style={[styles.body, { color: theme.textColor, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }, theme.typographyStyle === "letter" && styles.letterBody, theme.typographyStyle === "academic" && styles.academicBody]}>{entry.bodyPolished || entry.body}</Text>}
+          {!entry.bodyPolished && !entry.body && !!entry.voiceTranscript && <Text style={[styles.body, { color: theme.textColor, fontFamily: customFont.body, fontSize: customText.size, lineHeight: customText.lineHeight, textAlign: customText.align }, theme.typographyStyle === "letter" && styles.letterBody]}>{entry.voiceTranscript}</Text>}
           {!entry.bodyPolished && !entry.body && !entry.voiceTranscript && <Text style={[styles.body, { color: theme.secondaryTextColor }]}>A quiet page.</Text>}
 
-          {!!entry.photos?.length && (
-            <View style={styles.photos}>
-              {entry.photos.map(photo => <Image key={photo} source={{ uri: photo }} style={styles.photo} contentFit="cover" />)}
-            </View>
-          )}
+          <StickerStrip stickers={entry.stickers} accent={accent} />
+          <FramedPhotos photos={entry.photos} frameKey={entry.photoFrameKey} accent={accent} />
 
           {!!entry.tags?.length && (
             <View style={styles.tags}>
@@ -435,8 +439,6 @@ const styles = StyleSheet.create({
   voicePlay: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   voiceTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   voiceMeta: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
-  photos: { marginTop: 24, gap: 10 },
-  photo: { width: "100%", height: 230, borderRadius: 12 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 26 },
   tag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
   tagText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },

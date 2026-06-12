@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -19,11 +20,18 @@ import type { Entry, FutureMessage } from "@/types";
 
 type FutureType = "future-self" | "loved-one" | "unlock-later" | "reminder-only";
 type LovedOneDelivery = "local" | "email" | "manual";
+type DateOption = "tomorrow" | "month" | "year" | "custom";
 const TYPES: Array<{ id: FutureType; label: string; icon: keyof typeof Feather.glyphMap }> = [
   { id: "future-self", label: "Future Self", icon: "user" },
   { id: "loved-one", label: "Loved One", icon: "heart" },
   { id: "unlock-later", label: "Unlock Later", icon: "lock" },
   { id: "reminder-only", label: "Reminder Only", icon: "bell" },
+];
+const DATE_OPTIONS: Array<{ id: DateOption; label: string }> = [
+  { id: "tomorrow", label: "Tomorrow" },
+  { id: "month", label: "1 month" },
+  { id: "year", label: "1 year" },
+  { id: "custom", label: "Custom date" },
 ];
 
 function dateFromPreset(months = 0, years = 0, days = 0) {
@@ -33,6 +41,14 @@ function dateFromPreset(months = 0, years = 0, days = 0) {
   date.setFullYear(date.getFullYear() + years);
   date.setHours(9, 0, 0, 0);
   return date.toISOString();
+}
+
+function friendlyDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Choose a future date";
+  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day} • ${time}`;
 }
 
 export default function FutureMessagesScreen() {
@@ -54,6 +70,10 @@ export default function FutureMessagesScreen() {
   const [lovedOneDelivery, setLovedOneDelivery] = useState<LovedOneDelivery>("local");
   const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState(dateFromPreset(0, 0, 1));
+  const [dateOption, setDateOption] = useState<DateOption>("tomorrow");
+  const [showCustomDate, setShowCustomDate] = useState(false);
+  const [customDateDraft, setCustomDateDraft] = useState(new Date(deliveryDate));
+  const [dateError, setDateError] = useState("");
   const [preview, setPreview] = useState<FutureMessage | null>(null);
   const [unlockTarget, setUnlockTarget] = useState<FutureMessage | null>(null);
   const [editTarget, setEditTarget] = useState<FutureMessage | null>(null);
@@ -68,6 +88,7 @@ export default function FutureMessagesScreen() {
   const reset = () => {
     setEditing(null); setSelectedEntry(null); setType("future-self"); setTitle(""); setBody("");
     setRecipientName("Future Me"); setRecipientEmail(""); setDeliveryDate(dateFromPreset(0, 0, 1));
+    setDateOption("tomorrow"); setShowCustomDate(false); setDateError("");
     setLovedOneDelivery("local"); setConsentConfirmed(false);
   };
 
@@ -126,7 +147,7 @@ export default function FutureMessagesScreen() {
     ]);
   };
 
-  const valid = title.trim() && deliveryDate && new Date(deliveryDate).getTime() > Date.now() && (type === "reminder-only" || body.trim()) &&
+  const valid = title.trim() && deliveryDate && (type === "reminder-only" || body.trim()) &&
     (type !== "loved-one" || (recipientName.trim() && (lovedOneDelivery !== "email" || (recipientEmail.trim() && consentConfirmed))));
   const shareText = (messageTitle = title, messageBody = body, recipient = recipientName) =>
     [`For ${recipient || "someone special"}`, messageTitle.trim(), messageBody.trim(), "Shared manually from Amanat Diary"].filter(Boolean).join("\n\n");
@@ -176,11 +197,51 @@ export default function FutureMessagesScreen() {
   };
 
   const requestSave = () => {
+    const selectedTime = new Date(deliveryDate).getTime();
+    if (!Number.isFinite(selectedTime) || selectedTime <= Date.now()) {
+      setDateError("Please choose a future date.");
+      Alert.alert("Please choose a future date.");
+      return;
+    }
     if (type === "loved-one" && lovedOneDelivery === "email" && !automaticEmailAvailable) {
       Alert.alert("Cloud login required", "Automatic email delivery needs cloud backup/login. You can still save locally or share manually.");
       return;
     }
     requirePin("save");
+  };
+
+  const selectDateOption = (option: DateOption) => {
+    if (option === "custom") {
+      const current = new Date(deliveryDate);
+      setCustomDateDraft(Number.isNaN(current.getTime()) ? new Date() : current);
+      setShowCustomDate(true);
+      return;
+    }
+    const next = option === "tomorrow" ? dateFromPreset(0, 0, 1) : option === "month" ? dateFromPreset(1) : dateFromPreset(0, 1);
+    setDeliveryDate(next);
+    setDateOption(option);
+    setDateError("");
+  };
+
+  const applyCustomDate = (date: Date) => {
+    if (date.getTime() <= Date.now()) {
+      setDateError("Please choose a future date.");
+      Alert.alert("Please choose a future date.");
+      return false;
+    }
+    setDeliveryDate(date.toISOString());
+    setDateOption("custom");
+    setDateError("");
+    return true;
+  };
+
+  const onCustomDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") {
+      setShowCustomDate(false);
+      if (event.type !== "dismissed" && date) applyCustomDate(date);
+      return;
+    }
+    if (date) setCustomDateDraft(date);
   };
 
   const emailInput = (message: FutureMessage): FutureEmailInput => ({
@@ -282,7 +343,7 @@ export default function FutureMessagesScreen() {
   const openEditMessage = (message: FutureMessage) => {
     setEditing(message); setType((TYPES.some(item => item.id === message.deliveryType) ? message.deliveryType : "future-self") as FutureType);
     setTitle(message.title); setBody(message.body); setRecipientName(message.recipientName); setRecipientEmail(message.recipientEmail ?? "");
-    setDeliveryDate(message.deliveryDate); setLovedOneDelivery(message.emailDeliveryMode ?? "local"); setConsentConfirmed(!!message.consentConfirmed); setShowCreate(true);
+    setDeliveryDate(message.deliveryDate); setDateOption("custom"); setDateError(""); setLovedOneDelivery(message.emailDeliveryMode ?? "local"); setConsentConfirmed(!!message.consentConfirmed); setShowCreate(true);
   };
 
   const cancelMessage = (message: FutureMessage) => Alert.alert("Cancel future memory?", "The memory will remain stored locally but its reminder will be canceled.", [
@@ -363,13 +424,30 @@ export default function FutureMessagesScreen() {
           <TextInput value={title} onChangeText={setTitle} placeholder="Letter title" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} />
           {type !== "reminder-only" && <TextInput value={body} onChangeText={setBody} multiline textAlignVertical="top" placeholder="Dear future me…" placeholderTextColor={colors.mutedForeground} style={[styles.bodyInput, { color: colors.foreground, borderColor: colors.border }]} />}
           <Text style={[styles.label, { color: colors.mutedForeground }]}>3 · CHOOSE DATE</Text>
-          <View style={styles.presets}><TouchableOpacity onPress={() => setDeliveryDate(dateFromPreset(0, 0, 1))} style={[styles.preset, { borderColor: colors.border }]}><Text style={{ color: colors.primary }}>Tomorrow</Text></TouchableOpacity><TouchableOpacity onPress={() => setDeliveryDate(dateFromPreset(1))} style={[styles.preset, { borderColor: colors.border }]}><Text style={{ color: colors.primary }}>1 month</Text></TouchableOpacity><TouchableOpacity onPress={() => setDeliveryDate(dateFromPreset(0, 1))} style={[styles.preset, { borderColor: colors.border }]}><Text style={{ color: colors.primary }}>1 year</Text></TouchableOpacity></View>
-          <TextInput value={deliveryDate} onChangeText={setDeliveryDate} placeholder="2030-06-12T09:00:00.000Z" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} />
+          <View style={styles.presets}>{DATE_OPTIONS.map(option => {
+            const selected = dateOption === option.id;
+            return <TouchableOpacity key={option.id} onPress={() => selectDateOption(option.id)} style={[styles.preset, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.card }]}><Feather name={selected ? "check-circle" : option.id === "custom" ? "calendar" : "clock"} size={14} color={selected ? colors.primaryForeground : colors.primary} /><Text style={[styles.presetText, { color: selected ? colors.primaryForeground : colors.primary }]}>{option.label}</Text></TouchableOpacity>;
+          })}</View>
+          <TouchableOpacity onPress={() => selectDateOption("custom")} style={[styles.dateDisplay, { backgroundColor: colors.card, borderColor: dateError ? colors.destructive : colors.border }]}>
+            <View style={[styles.dateIcon, { backgroundColor: colors.secondary }]}><Feather name="calendar" size={17} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.dateDisplayLabel, { color: colors.mutedForeground }]}>SELECTED DELIVERY DATE</Text><Text style={[styles.dateDisplayValue, { color: colors.foreground }]}>{friendlyDate(deliveryDate)}</Text></View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          {!!dateError && <Text style={[styles.dateError, { color: colors.destructive }]}>{dateError}</Text>}
+          {Platform.OS === "android" && showCustomDate && <DateTimePicker value={customDateDraft} mode="date" display="calendar" onChange={onCustomDateChange} />}
           <Text style={[styles.label, { color: colors.mutedForeground }]}>4 · RECIPIENT</Text>
           {type === "loved-one" ? <><View style={styles.deliveryOptions}>{([["local", "Save locally / remind me"], ["email", "Send automatically by email"], ["manual", "Share manually now"]] as Array<[LovedOneDelivery, string]>).map(([value, label]) => <TouchableOpacity key={value} onPress={() => setLovedOneDelivery(value)} style={[styles.deliveryOption, { borderColor: lovedOneDelivery === value ? colors.primary : colors.border, backgroundColor: lovedOneDelivery === value ? colors.secondary : colors.card }]}><Feather name={lovedOneDelivery === value ? "check-circle" : "circle"} size={15} color={lovedOneDelivery === value ? colors.primary : colors.mutedForeground} /><Text style={[styles.deliveryOptionText, { color: colors.foreground }]}>{label}</Text></TouchableOpacity>)}</View><TextInput value={recipientName} onChangeText={setRecipientName} placeholder="Recipient name" placeholderTextColor={colors.mutedForeground} style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} /><TextInput value={recipientEmail} onChangeText={setRecipientEmail} placeholder={lovedOneDelivery === "email" ? "Recipient email required" : "Email optional"} placeholderTextColor={colors.mutedForeground} autoCapitalize="none" keyboardType="email-address" style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} />{lovedOneDelivery === "email" ? <><View style={styles.emailConfirm}><Text style={styles.emailConfirmTitle}>Automatic email confirmation</Text><Text style={styles.emailConfirmText}>Recipient: {recipientName || "Not entered"}{"\n"}Email: {recipientEmail || "Not entered"}{"\n"}Delivery: {formatFutureDate(deliveryDate)}{"\n"}Preview: {body.trim().slice(0, 140) || "No message entered"}</Text><Text style={styles.emailWarning}>This email will be sent automatically on the selected date if cloud delivery is enabled.</Text></View><TouchableOpacity onPress={() => setConsentConfirmed(value => !value)} style={styles.consent}><Feather name={consentConfirmed ? "check-square" : "square"} size={19} color={colors.primary} /><Text style={[styles.note, { color: colors.foreground }]}>I confirm I want Amanat Diary to send this memory by email on the selected date.</Text></TouchableOpacity>{!automaticEmailAvailable && <Text style={[styles.note, { color: colors.destructive }]}>Automatic email delivery needs cloud backup/login. You can still save locally or share manually.</Text>}</> : <View style={styles.localNotice}><Text style={styles.localBadge}>LOCAL REMINDER ONLY</Text><Text style={[styles.note, { color: colors.mutedForeground }]}>This memory is saved locally and can be shared manually.</Text></View>}<View style={styles.shareActions}><TouchableOpacity disabled={!body.trim()} onPress={shareNow} style={[styles.shareAction, { borderColor: colors.border }]}><Feather name="share-2" size={15} color={colors.primary} /><Text style={[styles.shareActionText, { color: colors.primary }]}>Share Now</Text></TouchableOpacity><TouchableOpacity disabled={!body.trim()} onPress={copyMessage} style={[styles.shareAction, { borderColor: colors.border }]}><Feather name="copy" size={15} color={colors.primary} /><Text style={[styles.shareActionText, { color: colors.primary }]}>Copy Message</Text></TouchableOpacity><TouchableOpacity disabled={!body.trim()} onPress={exportDraftPdf} style={[styles.shareAction, { borderColor: colors.border }]}><Feather name="file-text" size={15} color={colors.primary} /><Text style={[styles.shareActionText, { color: colors.primary }]}>Export as PDF</Text></TouchableOpacity></View></> : <Text style={[styles.note, { color: colors.mutedForeground }]}>{type === "unlock-later" ? "The linked memory stays private until this date." : "No email is required. This reminder stays on your device."}</Text>}
           <TouchableOpacity disabled={!valid} onPress={requestSave} style={[styles.primary, { backgroundColor: colors.primary, opacity: valid ? 1 : 0.4 }]}><Text style={[styles.primaryText, { color: colors.primaryForeground }]}>{type === "loved-one" && lovedOneDelivery === "email" ? "Schedule Email" : type === "loved-one" ? "Save for Future" : "Confirm with PIN"}</Text></TouchableOpacity>
         </ScrollView>
       </Modal>
+
+      {Platform.OS !== "android" && <Modal visible={showCustomDate} transparent animationType="fade" onRequestClose={() => setShowCustomDate(false)}>
+        <View style={styles.datePickerOverlay}><View style={[styles.datePickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.datePickerTitle, { color: colors.foreground }]}>Choose a future date</Text>
+          <DateTimePicker value={customDateDraft} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={onCustomDateChange} />
+          <View style={styles.datePickerActions}><TouchableOpacity onPress={() => setShowCustomDate(false)} style={[styles.datePickerButton, { borderColor: colors.border }]}><Text style={[styles.datePickerButtonText, { color: colors.foreground }]}>Cancel</Text></TouchableOpacity><TouchableOpacity onPress={() => { if (applyCustomDate(customDateDraft)) setShowCustomDate(false); }} style={[styles.datePickerButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}><Text style={[styles.datePickerButtonText, { color: colors.primaryForeground }]}>Use this date</Text></TouchableOpacity></View>
+        </View></View>
+      </Modal>}
 
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}><View style={styles.overlay}><View style={[styles.preview, { backgroundColor: "#FFF9EE", borderColor: "#D9BA8A" }]}><Feather name="mail" size={26} color="#A47142" /><Text style={styles.previewTitle}>{preview?.title}</Text><Text style={styles.previewDate}>{preview ? formatFutureDate(preview.deliveryDate) : ""}</Text><ScrollView><Text style={styles.previewBody}>{preview?.body || "A gentle reminder from your past."}</Text></ScrollView><TouchableOpacity onPress={() => setPreview(null)} style={styles.previewClose}><Text style={{ color: "#8A6847" }}>Close letter</Text></TouchableOpacity></View></View></Modal>
 
@@ -386,9 +464,10 @@ const styles = StyleSheet.create({
   card: { padding: 16, borderWidth: 1, borderRadius: 18, gap: 10 }, cardTop: { flexDirection: "row", alignItems: "center", gap: 10 }, seal: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" }, cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold" }, meta: { fontSize: 10, marginTop: 3, textTransform: "capitalize" }, status: { fontSize: 10, fontFamily: "Inter_700Bold", textTransform: "uppercase" }, date: { fontSize: 12, fontFamily: "Inter_600SemiBold" }, actions: { flexDirection: "row", gap: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#D9C8B5", paddingTop: 10 }, action: { fontSize: 11, fontFamily: "Inter_700Bold" },
   empty: { flex: 1, justifyContent: "center", paddingVertical: 35 }, primary: { minHeight: 50, borderRadius: 25, alignItems: "center", justifyContent: "center", marginTop: 14 }, primaryText: { fontSize: 14, fontFamily: "Inter_700Bold" }, secondary: { minHeight: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center", marginTop: 10 }, secondaryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   form: { paddingHorizontal: 20, gap: 13 }, formHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }, formTitle: { fontSize: 20, fontFamily: "Inter_700Bold" }, label: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 8 }, typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, typeCard: { width: "48%", flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "center", gap: 8 }, typeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  linked: { borderWidth: 1, borderRadius: 13, padding: 13, flexDirection: "row", alignItems: "center", gap: 9 }, linkedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" }, input: { minHeight: 49, borderWidth: 1, borderRadius: 13, paddingHorizontal: 14, fontSize: 13 }, bodyInput: { minHeight: 145, borderWidth: 1, borderRadius: 13, padding: 14, fontSize: 14, lineHeight: 21 }, presets: { flexDirection: "row", gap: 8 }, preset: { flex: 1, borderWidth: 1, borderRadius: 18, paddingVertical: 9, alignItems: "center" }, note: { fontSize: 11, lineHeight: 17 },
+  linked: { borderWidth: 1, borderRadius: 13, padding: 13, flexDirection: "row", alignItems: "center", gap: 9 }, linkedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" }, input: { minHeight: 49, borderWidth: 1, borderRadius: 13, paddingHorizontal: 14, fontSize: 13 }, bodyInput: { minHeight: 145, borderWidth: 1, borderRadius: 13, padding: 14, fontSize: 14, lineHeight: 21 }, presets: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, preset: { width: "48%", flexGrow: 1, minHeight: 42, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 11, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" }, presetText: { fontSize: 11, fontFamily: "Inter_700Bold" }, dateDisplay: { minHeight: 64, borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: "row", alignItems: "center", gap: 10 }, dateIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" }, dateDisplayLabel: { fontSize: 8, letterSpacing: 0.8, fontFamily: "Inter_700Bold" }, dateDisplayValue: { fontSize: 13, lineHeight: 19, marginTop: 2, fontFamily: "Inter_600SemiBold" }, dateError: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: -6 }, note: { fontSize: 11, lineHeight: 17 },
   localNotice: { backgroundColor: "#FFF7E9", borderColor: "#E5D2AF", borderWidth: 1, borderRadius: 13, padding: 12, gap: 7 }, localBadge: { alignSelf: "flex-start", color: "#8A6847", backgroundColor: "#F3E5CF", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3, fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 0.6, overflow: "hidden", marginTop: 4 }, shareActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, shareAction: { flexGrow: 1, minWidth: "30%", borderWidth: 1, borderRadius: 18, minHeight: 40, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }, shareActionText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   deliveryOptions: { gap: 7 }, deliveryOption: { borderWidth: 1, borderRadius: 13, padding: 12, flexDirection: "row", alignItems: "center", gap: 9 }, deliveryOptionText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   emailConfirm: { backgroundColor: "#FFF9EE", borderColor: "#D9BA8A", borderWidth: 1, borderRadius: 14, padding: 13, gap: 7 }, emailConfirmTitle: { color: "#594332", fontSize: 12, fontFamily: "Inter_700Bold" }, emailConfirmText: { color: "#694F37", fontSize: 11, lineHeight: 18 }, emailWarning: { color: "#A47142", fontSize: 10, lineHeight: 16, fontFamily: "Inter_600SemiBold" }, consent: { flexDirection: "row", alignItems: "flex-start", gap: 9, paddingVertical: 4 },
+  datePickerOverlay: { flex: 1, backgroundColor: "#2B201680", justifyContent: "center", padding: 24 }, datePickerCard: { borderWidth: 1, borderRadius: 20, padding: 18, gap: 12 }, datePickerTitle: { fontSize: 17, textAlign: "center", fontFamily: "Inter_700Bold" }, datePickerActions: { flexDirection: "row", gap: 8 }, datePickerButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 22, alignItems: "center", justifyContent: "center" }, datePickerButtonText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   overlay: { flex: 1, backgroundColor: "#2B2016AA", justifyContent: "center", padding: 24 }, preview: { maxHeight: "75%", padding: 25, borderRadius: 20, borderWidth: 1, alignItems: "center" }, previewTitle: { color: "#594332", fontSize: 23, fontFamily: "Inter_700Bold", marginTop: 15, textAlign: "center" }, previewDate: { color: "#A47142", fontSize: 11, marginVertical: 9 }, previewBody: { color: "#594332", fontSize: 15, lineHeight: 25, marginTop: 14 }, previewClose: { marginTop: 22, padding: 10 },
 });

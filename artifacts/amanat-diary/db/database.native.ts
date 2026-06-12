@@ -36,6 +36,7 @@ export async function initializeDatabase() {
         "ALTER TABLE future_messages ADD COLUMN emailDeliveryMode TEXT",
         "ALTER TABLE future_messages ADD COLUMN consentConfirmed INTEGER DEFAULT 0",
         "ALTER TABLE entries ADD COLUMN voiceLanguage TEXT",
+        "ALTER TABLE entries ADD COLUMN customizationJson TEXT",
       ]) {
         try { await database.execAsync(statement); } catch {}
       }

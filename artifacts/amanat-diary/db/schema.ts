@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS entries (
   voiceTranscript TEXT,
   voiceLanguage TEXT,
   photosJson TEXT,
+  customizationJson TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   deletedAt TEXT,

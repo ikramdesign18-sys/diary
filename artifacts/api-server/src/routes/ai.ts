@@ -1,10 +1,17 @@
 import { Router, type IRouter, type Response } from "express";
+import multer from "multer";
 
 import { detectTheme, polishVoice } from "../services/aiEndpoints";
-import { AiServiceError } from "../services/groqClient";
+import { AiServiceError, requestGroqTranscription } from "../services/groqClient";
 import { ValidationError } from "../utils/validateAiRequest";
 
 const router: IRouter = Router();
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 24 * 1024 * 1024, files: 1 },
+});
+const supportedAudio = /\.(flac|mp3|mp4|mpeg|mpga|m4a|ogg|wav|webm)$/i;
+const transcriptionLanguages = new Set(["auto", "en", "ur", "hi", "roman-ur"]);
 
 function handleError(error: unknown, res: Response) {
   if (error instanceof ValidationError) return res.status(error.status).json({ error: error.message, fallbackAllowed: true });
@@ -28,8 +35,14 @@ router.post("/ai/voice-polish", async (req, res) => {
   }
 });
 
-router.post("/ai/transcribe-audio", (_req, res) => {
-  return res.status(501).json({ error: "Audio transcription backend is not configured yet", fallbackAllowed: true });
+router.post("/ai/transcribe-audio", audioUpload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file || !supportedAudio.test(req.file.originalname)) throw new AiServiceError("A supported audio file is required", 400);
+    const language = typeof req.body.language === "string" && transcriptionLanguages.has(req.body.language) ? req.body.language : "auto";
+    return res.json(await requestGroqTranscription(req.file, language));
+  } catch (error) {
+    return handleError(error, res);
+  }
 });
 
 export default router;

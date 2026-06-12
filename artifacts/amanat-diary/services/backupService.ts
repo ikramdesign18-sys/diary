@@ -80,6 +80,13 @@ export function validateBackup(value: unknown, fileName = "backup.json"): Backup
     bodyOriginal: entry.body ?? "",
     tagsJson: JSON.stringify(entry.tags ?? []),
     photosJson: JSON.stringify(entry.photos ?? []),
+    customizationJson: JSON.stringify({
+      fontKey: entry.fontKey,
+      backgroundKey: entry.backgroundKey,
+      stickers: entry.stickers ?? [],
+      photoFrameKey: entry.photoFrameKey,
+      textStyleKey: entry.textStyleKey,
+    }),
     isFavorite: Number(entry.isFavorite === true || entry.isFavorite === 1),
     isLocked: Number(entry.isLocked === true || entry.isLocked === 1),
     hasVoice: Number(entry.hasVoice === true || entry.hasVoice === 1),

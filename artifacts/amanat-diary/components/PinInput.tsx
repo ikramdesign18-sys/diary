@@ -21,11 +21,12 @@ interface PinInputProps {
   title?: string;
   subtitle?: string;
   error?: boolean;
+  compact?: boolean;
 }
 
 const KEYS = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
 
-export function PinInput({ length = 4, onComplete, title, subtitle, error }: PinInputProps) {
+export function PinInput({ length = 4, onComplete, title, subtitle, error, compact = false }: PinInputProps) {
   const colors = useColors();
   const [pin, setPin] = useState("");
   const shakeX = useSharedValue(0);
@@ -62,15 +63,16 @@ export function PinInput({ length = 4, onComplete, title, subtitle, error }: Pin
   };
 
   return (
-    <View style={styles.container}>
-      {title && <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>}
-      {subtitle && <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
-      <Animated.View style={[styles.dots, dotsStyle]}>
+    <View style={[styles.container, compact && styles.compactContainer]}>
+      {title && <Text style={[styles.title, compact && styles.compactTitle, { color: colors.foreground }]}>{title}</Text>}
+      {subtitle && <Text style={[styles.subtitle, compact && styles.compactSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
+      <Animated.View style={[styles.dots, compact && styles.compactDots, dotsStyle]}>
         {Array.from({ length }).map((_, i) => (
           <View
             key={i}
             style={[
               styles.dot,
+              compact && styles.compactDot,
               {
                 backgroundColor: i < pin.length ? colors.primary : "transparent",
                 borderColor: error ? colors.destructive : i < pin.length ? colors.primary : colors.border,
@@ -79,16 +81,16 @@ export function PinInput({ length = 4, onComplete, title, subtitle, error }: Pin
           />
         ))}
       </Animated.View>
-      <View style={styles.keypad}>
+      <View style={[styles.keypad, compact && styles.compactKeypad]}>
         {KEYS.map((key, i) => (
           <TouchableOpacity
             key={i}
-            style={[styles.key, { backgroundColor: key === "" ? "transparent" : colors.secondary }]}
+            style={[styles.key, compact && styles.compactKey, { backgroundColor: key === "" ? "transparent" : colors.secondary }]}
             onPress={() => handleKey(key)}
             disabled={key === ""}
             activeOpacity={0.6}
           >
-            <Text style={[styles.keyText, { color: key === "⌫" ? colors.mutedForeground : colors.foreground }]}>
+            <Text style={[styles.keyText, compact && styles.compactKeyText, { color: key === "⌫" ? colors.mutedForeground : colors.foreground }]}>
               {key}
             </Text>
           </TouchableOpacity>
@@ -142,5 +144,36 @@ const styles = StyleSheet.create({
   keyText: {
     fontSize: 24,
     fontFamily: "Inter_400Regular",
+  },
+  compactContainer: {
+    gap: 18,
+  },
+  compactTitle: {
+    fontSize: 20,
+  },
+  compactSubtitle: {
+    fontSize: 13,
+    marginTop: -10,
+  },
+  compactDots: {
+    gap: 16,
+    marginVertical: 2,
+  },
+  compactDot: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+  },
+  compactKeypad: {
+    width: 238,
+    gap: 10,
+  },
+  compactKey: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+  },
+  compactKeyText: {
+    fontSize: 21,
   },
 });
