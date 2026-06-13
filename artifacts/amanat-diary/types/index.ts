@@ -79,6 +79,10 @@ export interface PageSticker {
   y?: number;
   width?: number;
   height?: number;
+  xPercent?: number;
+  yPercent?: number;
+  widthPercent?: number;
+  heightPercent?: number;
   rotation?: number;
   zIndex?: number;
 }

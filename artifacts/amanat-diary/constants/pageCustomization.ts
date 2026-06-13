@@ -45,15 +45,23 @@ export const STICKERS: PageSticker[] = VECTOR_STICKERS.map(item => ({ id: item.i
 
 export function createPlacedSticker(sticker: PageSticker, index: number): PageSticker {
   const assetId = sticker.assetId ?? sticker.id;
+  const x = 18 + (index % 3) * 88;
+  const y = 150 + Math.floor(index / 3) * 88;
+  const width = 70;
+  const height = 70;
   return {
     id: `${assetId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     assetId,
     emoji: sticker.emoji,
     category: sticker.category,
-    x: 18 + (index % 3) * 88,
-    y: 150 + Math.floor(index / 3) * 88,
-    width: 70,
-    height: 70,
+    x,
+    y,
+    width,
+    height,
+    xPercent: x / 320,
+    yPercent: y / 600,
+    widthPercent: width / 320,
+    heightPercent: height / 600,
     rotation: 0,
     zIndex: index + 1,
   };

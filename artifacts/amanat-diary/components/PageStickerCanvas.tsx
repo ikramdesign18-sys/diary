@@ -15,6 +15,8 @@ import type { PageSticker } from "@/types";
 
 export const STICKER_PAGE_WIDTH = 320;
 export const STICKER_PAGE_HEIGHT = 600;
+export const PAGE_CONTENT_HORIZONTAL_PADDING = 28;
+export const PAGE_CONTENT_TOP_PADDING = 24;
 const MIN_STICKER_SIZE = 44;
 const MAX_STICKER_SIZE = STICKER_PAGE_WIDTH;
 const CONTROL_SIZE = 38;
@@ -27,11 +29,15 @@ const clamp = (value: number, min: number, max: number) => {
 };
 
 function stickerLayout(sticker: PageSticker, index: number): StickerLayout {
-  const width = clamp(sticker.width ?? 70, MIN_STICKER_SIZE, MAX_STICKER_SIZE);
-  const height = clamp(sticker.height ?? width, MIN_STICKER_SIZE, MAX_STICKER_SIZE);
+  const normalizedWidth = Number.isFinite(sticker.widthPercent) ? sticker.widthPercent! * STICKER_PAGE_WIDTH : undefined;
+  const normalizedHeight = Number.isFinite(sticker.heightPercent) ? sticker.heightPercent! * STICKER_PAGE_HEIGHT : undefined;
+  const width = clamp(normalizedWidth ?? sticker.width ?? 70, MIN_STICKER_SIZE, MAX_STICKER_SIZE);
+  const height = clamp(normalizedHeight ?? sticker.height ?? width, MIN_STICKER_SIZE, MAX_STICKER_SIZE);
+  const normalizedX = Number.isFinite(sticker.xPercent) ? sticker.xPercent! * STICKER_PAGE_WIDTH : undefined;
+  const normalizedY = Number.isFinite(sticker.yPercent) ? sticker.yPercent! * STICKER_PAGE_HEIGHT : undefined;
   return {
-    x: clamp(sticker.x ?? 18 + (index % 3) * 92, 0, STICKER_PAGE_WIDTH - width),
-    y: clamp(sticker.y ?? 150 + Math.floor(index / 3) * 92, 0, STICKER_PAGE_HEIGHT - height),
+    x: clamp(normalizedX ?? sticker.x ?? 18 + (index % 3) * 92, 0, STICKER_PAGE_WIDTH - width),
+    y: clamp(normalizedY ?? sticker.y ?? 150 + Math.floor(index / 3) * 92, 0, STICKER_PAGE_HEIGHT - height),
     width,
     height,
     rotation: Number.isFinite(sticker.rotation) ? sticker.rotation! : 0,
@@ -85,6 +91,10 @@ function EditableSticker({
       y: clamp(nextY, 0, STICKER_PAGE_HEIGHT - safeHeight),
       width: safeWidth,
       height: safeHeight,
+      xPercent: clamp(nextX, 0, STICKER_PAGE_WIDTH - safeWidth) / STICKER_PAGE_WIDTH,
+      yPercent: clamp(nextY, 0, STICKER_PAGE_HEIGHT - safeHeight) / STICKER_PAGE_HEIGHT,
+      widthPercent: safeWidth / STICKER_PAGE_WIDTH,
+      heightPercent: safeHeight / STICKER_PAGE_HEIGHT,
       rotation: Number.isFinite(nextRotation) ? nextRotation : 0,
     });
   }, [onChange]);
@@ -325,6 +335,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
     borderRadius: 12,
   },
   emoji: { textAlign: "center" },

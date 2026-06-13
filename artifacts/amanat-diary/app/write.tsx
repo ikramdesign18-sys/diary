@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MoodPicker } from "@/components/MoodPicker";
 import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
 import { PageCustomizationSheet } from "@/components/PageCustomizationSheet";
-import { PageStickerCanvas } from "@/components/PageStickerCanvas";
+import { PAGE_CONTENT_HORIZONTAL_PADDING, PAGE_CONTENT_TOP_PADDING, PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { DEFAULT_THEME_ID, getDiaryTheme } from "@/constants/diaryThemes";
 import { createPlacedSticker, getMoodStyleSuggestion, getPageBackground, getPageFont, getTextStyle, STICKERS } from "@/constants/pageCustomization";
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   savedText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   saveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
   saveBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  page: { paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
+  page: { paddingHorizontal: PAGE_CONTENT_HORIZONTAL_PADDING, paddingTop: PAGE_CONTENT_TOP_PADDING, position: "relative", minHeight: 620 },
   pageHeader: { paddingVertical: 16, borderBottomWidth: 1, marginBottom: 16 },
   pageDate: { fontSize: 13, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   pageTime: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },

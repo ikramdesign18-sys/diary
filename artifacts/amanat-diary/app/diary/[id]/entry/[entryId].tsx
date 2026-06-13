@@ -20,7 +20,7 @@ import type { Entry } from "@/types";
 import { activeEntryLock } from "@/lib/futureMemories";
 import { VoicePlayer } from "@/components/VoicePlayer";
 import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
-import { PageStickerCanvas } from "@/components/PageStickerCanvas";
+import { PAGE_CONTENT_HORIZONTAL_PADDING, PAGE_CONTENT_TOP_PADDING, PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { getDiaryTheme } from "@/constants/diaryThemes";
 import { getPageBackground, getPageFont, getTextStyle } from "@/constants/pageCustomization";
 
@@ -111,7 +111,7 @@ export default function EntryScreen() {
         nestedScrollEnabled
         directionalLockEnabled
         style={styles.pageScroll}
-        contentContainerStyle={[styles.page, { paddingBottom: botPad + 32 }]}
+        contentContainerStyle={[styles.page, { paddingBottom: botPad + 80 }]}
         showsVerticalScrollIndicator={false}
       >
         <PageStickerCanvas stickers={entry.stickers} accent={accent} />
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   diaryName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
   toolbarRight: { flexDirection: "row" },
   pageScroll: { flex: 1 },
-  page: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
+  page: { flexGrow: 1, paddingHorizontal: PAGE_CONTENT_HORIZONTAL_PADDING, paddingTop: PAGE_CONTENT_TOP_PADDING, position: "relative", minHeight: 620 },
   pageHeader: { paddingVertical: 18, borderBottomWidth: 1, marginBottom: 24, gap: 6 },
   pageDate: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
   pageHeaderRight: { flexDirection: "row", alignItems: "center", gap: 10 },

@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
 import { FramedPhotos, PageBackgroundDecorations } from "@/components/PageCustomizationElements";
-import { PageStickerCanvas } from "@/components/PageStickerCanvas";
+import { PAGE_CONTENT_HORIZONTAL_PADDING, PAGE_CONTENT_TOP_PADDING, PageStickerCanvas } from "@/components/PageStickerCanvas";
 import { ThemeSelectorSheet } from "@/components/ThemeSelectorSheet";
 import { PinConfirmModal } from "@/components/PinConfirmModal";
 import { VoicePlayer } from "@/components/VoicePlayer";
@@ -45,6 +45,7 @@ function ReaderPage({
   controlsVisible,
   onToggleControls,
   onLongPress,
+  onVerticalScrollChange,
   lockedUntil,
 }: {
   entry: Entry;
@@ -53,6 +54,7 @@ function ReaderPage({
   controlsVisible: boolean;
   onToggleControls: () => void;
   onLongPress: () => void;
+  onVerticalScrollChange: (scrolling: boolean) => void;
   lockedUntil?: string;
 }) {
   const colors = useColors();
@@ -71,7 +73,7 @@ function ReaderPage({
 
   return (
     <View style={{ width, flex: 1, paddingHorizontal: width > 700 ? 80 : 14, paddingVertical: controlsVisible ? 8 : 18 }}>
-      <Pressable onPress={onToggleControls} onLongPress={onLongPress} delayLongPress={450} style={[styles.paper, { backgroundColor: paper }]}>
+      <View style={[styles.paper, { backgroundColor: paper }]}>
         {entry.backgroundKey && entry.backgroundKey !== "theme"
           ? <PageBackgroundDecorations backgroundKey={entry.backgroundKey} accent={accent} />
           : theme.lineStyle !== "none" && theme.lineStyle !== "dotted" && (
@@ -100,25 +102,33 @@ function ReaderPage({
           <View pointerEvents="none" style={[styles.pageDecoration, { borderColor: accent, opacity: theme.decorationStyle === "halo" ? 0.12 : 0.2 }]} />
         )}
         {lockedUntil ? (
-          <View style={styles.lockedPage}>
+          <Pressable onPress={onToggleControls} onLongPress={onLongPress} delayLongPress={450} style={styles.lockedPage}>
             <View style={[styles.lockedSeal, { backgroundColor: accent }]}><Feather name="lock" size={28} color="#FFFDF9" /></View>
             <Text style={[styles.lockedTitle, { color: theme.textColor }]}>This memory is sealed</Text>
             <Text style={[styles.lockedCopy, { color: theme.secondaryTextColor }]}>This memory will open on{"\n"}{formatFutureDate(lockedUntil)}.</Text>
             <Text style={[styles.lockedHint, { color: accent }]}>Long press for private options</Text>
-          </View>
+          </Pressable>
         ) : <ScrollView
           nestedScrollEnabled
           directionalLockEnabled
           style={styles.paperScroll}
           contentContainerStyle={styles.paperContent}
           showsVerticalScrollIndicator={false}
+          onScrollBeginDrag={() => onVerticalScrollChange(true)}
+          onScrollEndDrag={() => onVerticalScrollChange(false)}
+          onMomentumScrollEnd={() => onVerticalScrollChange(false)}
         >
           <PageStickerCanvas stickers={entry.stickers} accent={accent} />
-          <View style={[
-            styles.pageHeader,
-            { borderBottomColor: accent + "35" },
-            theme.headerStyle === "chapter" && styles.chapterHeader,
-          ]}>
+          <Pressable
+            onPress={onToggleControls}
+            onLongPress={onLongPress}
+            delayLongPress={450}
+            style={[
+              styles.pageHeader,
+              { borderBottomColor: accent + "35" },
+              theme.headerStyle === "chapter" && styles.chapterHeader,
+            ]}
+          >
             <View style={{ flex: 1 }}>
               <Text style={[styles.date, { color: accent }]}>{date}</Text>
               <Text style={[styles.time, { color: theme.secondaryTextColor }]}>{time}</Text>
@@ -126,7 +136,7 @@ function ReaderPage({
             <View style={[styles.mood, { backgroundColor: accent + "18" }]}>
               <Text style={[styles.moodText, { color: accent }]}>{entry.mood}</Text>
             </View>
-          </View>
+          </Pressable>
 
           <Text style={[styles.pageEyebrow, { color: accent }]}>PAGE {entry.pageNumber} OF {total}</Text>
           {!!entry.title && (
@@ -162,7 +172,7 @@ function ReaderPage({
             <Text style={[styles.paperFooterText, { color: accent }]}>Page {entry.pageNumber}</Text>
           </View>
         </ScrollView>}
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -180,6 +190,7 @@ export default function DiaryViewScreen() {
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [query, setQuery] = useState("");
   const [unlockTargetId, setUnlockTargetId] = useState<string | null>(null);
+  const [verticalScrolling, setVerticalScrolling] = useState(false);
   const listRef = useRef<FlatList<Entry>>(null);
   const diary = diaries.find(item => item.id === id);
   const topPad = Platform.OS === "web" ? 42 : insets.top;
@@ -300,6 +311,7 @@ export default function DiaryViewScreen() {
         keyExtractor={entry => entry.id}
         horizontal
         pagingEnabled
+        scrollEnabled={!verticalScrolling}
         nestedScrollEnabled
         directionalLockEnabled
         bounces={false}
@@ -315,6 +327,7 @@ export default function DiaryViewScreen() {
             controlsVisible={controlsVisible}
             onToggleControls={() => setControlsVisible(visible => !visible)}
             onLongPress={() => showPageActions(item)}
+            onVerticalScrollChange={setVerticalScrolling}
             lockedUntil={activeEntryLock(futureMessages, item.id)?.unlockDate ?? activeEntryLock(futureMessages, item.id)?.deliveryDate}
           />
         )}
@@ -430,7 +443,7 @@ const styles = StyleSheet.create({
   insetBorder: { ...StyleSheet.absoluteFillObject, margin: 11, borderWidth: 1, borderRadius: 3 },
   marginRule: { position: "absolute", top: 0, bottom: 0, left: 20, width: 1, opacity: 0.35 },
   pageDecoration: { position: "absolute", width: 150, height: 150, borderWidth: 1, borderRadius: 75, right: -75, top: -75 },
-  paperContent: { paddingHorizontal: 26, paddingTop: 24, paddingBottom: 72, minHeight: "100%", position: "relative" },
+  paperContent: { flexGrow: 1, paddingHorizontal: PAGE_CONTENT_HORIZONTAL_PADDING, paddingTop: PAGE_CONTENT_TOP_PADDING, paddingBottom: 120, position: "relative" },
   pageHeader: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, paddingBottom: 14, marginBottom: 22 },
   chapterHeader: { justifyContent: "center", paddingTop: 8, borderBottomWidth: 0 },
   date: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.25 },
