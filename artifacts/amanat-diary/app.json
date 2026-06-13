@@ -4,14 +4,14 @@
     "slug": "amanat-diary",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/branding/amanat-icon.png",
     "scheme": "amanatdiary",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#FBF8F3"
+      "image": "./assets/branding/amanat-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF4EA"
     },
     "ios": {
       "supportsTablet": false,
@@ -31,12 +31,12 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#FBF8F3"
+        "foregroundImage": "./assets/branding/amanat-adaptive-foreground.png",
+        "backgroundColor": "#F8EFE3"
       }
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/branding/amanat-icon.png"
     },
     "plugins": [
       [

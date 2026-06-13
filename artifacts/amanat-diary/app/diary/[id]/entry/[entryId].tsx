@@ -108,6 +108,9 @@ export default function EntryScreen() {
       </View>
 
       <ScrollView
+        nestedScrollEnabled
+        directionalLockEnabled
+        style={styles.pageScroll}
         contentContainerStyle={[styles.page, { paddingBottom: botPad + 32 }]}
         showsVerticalScrollIndicator={false}
       >
@@ -161,7 +164,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   diaryName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
   toolbarRight: { flexDirection: "row" },
-  page: { paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
+  pageScroll: { flex: 1 },
+  page: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 4, position: "relative", minHeight: 620 },
   pageHeader: { paddingVertical: 18, borderBottomWidth: 1, marginBottom: 24, gap: 6 },
   pageDate: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
   pageHeaderRight: { flexDirection: "row", alignItems: "center", gap: 10 },

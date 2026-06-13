@@ -106,7 +106,13 @@ function ReaderPage({
             <Text style={[styles.lockedCopy, { color: theme.secondaryTextColor }]}>This memory will open on{"\n"}{formatFutureDate(lockedUntil)}.</Text>
             <Text style={[styles.lockedHint, { color: accent }]}>Long press for private options</Text>
           </View>
-        ) : <ScrollView contentContainerStyle={styles.paperContent} showsVerticalScrollIndicator={false}>
+        ) : <ScrollView
+          nestedScrollEnabled
+          directionalLockEnabled
+          style={styles.paperScroll}
+          contentContainerStyle={styles.paperContent}
+          showsVerticalScrollIndicator={false}
+        >
           <PageStickerCanvas stickers={entry.stickers} accent={accent} />
           <View style={[
             styles.pageHeader,
@@ -294,6 +300,8 @@ export default function DiaryViewScreen() {
         keyExtractor={entry => entry.id}
         horizontal
         pagingEnabled
+        nestedScrollEnabled
+        directionalLockEnabled
         bounces={false}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onMomentumEnd}
@@ -414,6 +422,7 @@ const styles = StyleSheet.create({
   diaryTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   pageCount: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   paper: { flex: 1, maxWidth: 780, width: "100%", alignSelf: "center", borderRadius: 7, overflow: "hidden", shadowColor: "#3A2718", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 13, elevation: 5 },
+  paperScroll: { flex: 1 },
   pageLines: { ...StyleSheet.absoluteFillObject, paddingTop: 126, gap: 28 },
   pageLine: { height: 1 },
   dotGrid: { ...StyleSheet.absoluteFillObject, flexDirection: "row", flexWrap: "wrap", gap: 22, padding: 18, opacity: 0.42 },
@@ -421,7 +430,7 @@ const styles = StyleSheet.create({
   insetBorder: { ...StyleSheet.absoluteFillObject, margin: 11, borderWidth: 1, borderRadius: 3 },
   marginRule: { position: "absolute", top: 0, bottom: 0, left: 20, width: 1, opacity: 0.35 },
   pageDecoration: { position: "absolute", width: 150, height: 150, borderWidth: 1, borderRadius: 75, right: -75, top: -75 },
-  paperContent: { paddingHorizontal: 26, paddingTop: 24, paddingBottom: 34, minHeight: "100%", position: "relative" },
+  paperContent: { paddingHorizontal: 26, paddingTop: 24, paddingBottom: 72, minHeight: "100%", position: "relative" },
   pageHeader: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, paddingBottom: 14, marginBottom: 22 },
   chapterHeader: { justifyContent: "center", paddingTop: 8, borderBottomWidth: 0 },
   date: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.25 },
