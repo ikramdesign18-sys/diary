@@ -36,8 +36,8 @@ interface AppLockContextType {
   tryBiometric: () => Promise<boolean>;
   autoLockMinutes: number;
   setAutoLockMinutes: (minutes: number) => Promise<void>;
-  beginExternalActivity: () => void;
-  endExternalActivity: () => void;
+  beginExternalActivity: (reason?: string) => void;
+  endExternalActivity: (reason?: string, graceMs?: number) => void;
 }
 
 const AppLockContext = createContext<AppLockContextType | null>(null);
@@ -89,7 +89,9 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", state => {
-      if (externalActivityCount.current > 0 || Date.now() < externalActivityGraceUntil.current) {
+      const bypassActive = externalActivityCount.current > 0 || Date.now() < externalActivityGraceUntil.current;
+      if (__DEV__) console.info("[app-lock] AppState", { state, bypassActive, externalActivities: externalActivityCount.current });
+      if (bypassActive) {
         backgroundedAt.current = null;
         return;
       }
@@ -175,15 +177,17 @@ export function AppLockProvider({ children }: { children: React.ReactNode }) {
     setAutoLockMinutesState(minutes);
   }, []);
 
-  const beginExternalActivity = useCallback(() => {
+  const beginExternalActivity = useCallback((reason = "external-activity") => {
     externalActivityCount.current += 1;
     backgroundedAt.current = null;
+    if (__DEV__) console.info("[app-lock] bypass started", { reason, externalActivities: externalActivityCount.current });
   }, []);
 
-  const endExternalActivity = useCallback(() => {
+  const endExternalActivity = useCallback((reason = "external-activity", graceMs = 1_500) => {
     externalActivityCount.current = Math.max(0, externalActivityCount.current - 1);
-    externalActivityGraceUntil.current = Date.now() + 1_500;
+    externalActivityGraceUntil.current = Date.now() + Math.max(0, graceMs);
     backgroundedAt.current = null;
+    if (__DEV__) console.info("[app-lock] bypass ended", { reason, graceMs, externalActivities: externalActivityCount.current });
   }, []);
 
   return (

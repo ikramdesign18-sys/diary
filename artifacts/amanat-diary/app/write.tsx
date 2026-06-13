@@ -92,6 +92,7 @@ export default function WriteScreen() {
   const [detectingTheme, setDetectingTheme] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [stickerEditing, setStickerEditing] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [pickingImage, setPickingImage] = useState(false);
   const [customization, setCustomization] = useState<WriteCustomization>({
@@ -387,6 +388,7 @@ export default function WriteScreen() {
         <ScrollView
           contentContainerStyle={[styles.page, { paddingBottom: botPad + 150 }]}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={!stickerEditing}
           showsVerticalScrollIndicator={false}
         >
           <PageStickerCanvas
@@ -394,6 +396,7 @@ export default function WriteScreen() {
             accent={accentColor}
             editable
             onChange={stickers => setCustomization(current => ({ ...current, stickers }))}
+            onEditingChange={setStickerEditing}
           />
           {/* Page Header */}
           <View style={[styles.pageHeader, { borderBottomColor: colors.border + "40" }]}>

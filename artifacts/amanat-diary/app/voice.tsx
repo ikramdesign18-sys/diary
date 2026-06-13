@@ -9,10 +9,11 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, BackHandler, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VoicePlayer } from "@/components/VoicePlayer";
+import { useAppLock } from "@/context/AppLockContext";
 import { useDiary } from "@/context/DiaryContext";
 import { useColors } from "@/hooks/useColors";
 import { polishVoiceTranscript, transcribeVoice, type PolishStyle, type VoiceLanguage } from "@/services/voiceAIService";
@@ -67,12 +68,18 @@ function recordingError(stage: string, error: unknown) {
   return message;
 }
 
+function voiceDebug(event: string, details?: unknown) {
+  if (__DEV__) console.info(`[voice-recording] ${event}`, details ?? "");
+}
+
 export default function VoiceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { beginExternalActivity, endExternalActivity } = useAppLock();
   const { diaryId: paramDiaryId } = useLocalSearchParams<{ diaryId?: string }>();
   const { diaries, createEntry } = useDiary();
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const voiceBypassActiveRef = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [diaryId, setDiaryId] = useState(paramDiaryId ?? diaries[0]?.id ?? "");
   const [voiceUri, setVoiceUri] = useState<string>();
@@ -90,9 +97,31 @@ export default function VoiceScreen() {
   const topPad = Platform.OS === "web" ? 42 : insets.top;
   const botPad = Platform.OS === "web" ? 24 : insets.bottom;
 
+  const beginVoiceBypass = () => {
+    if (voiceBypassActiveRef.current) return;
+    voiceBypassActiveRef.current = true;
+    beginExternalActivity("voice-recording");
+    voiceDebug("app-lock bypass started");
+  };
+
+  const endVoiceBypass = (graceMs = 2_500) => {
+    if (!voiceBypassActiveRef.current) return;
+    voiceBypassActiveRef.current = false;
+    endExternalActivity("voice-recording", graceMs);
+    voiceDebug("app-lock bypass ended", { graceMs });
+  };
+
   useEffect(() => {
     if (diaries[0] && !diaries.some(diary => diary.id === diaryId)) setDiaryId(diaries[0].id);
   }, [diaries, diaryId]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const subscription = AppState.addEventListener("change", state => {
+      if (voiceBypassActiveRef.current) voiceDebug("AppState during active voice flow", { state });
+    });
+    return () => subscription.remove();
+  }, []);
 
   const persistRecording = async (uri: string) => {
     if (!FileSystem.documentDirectory) return uri;
@@ -144,6 +173,7 @@ export default function VoiceScreen() {
           text: "Discard", style: "destructive", onPress: async () => {
             await cleanupActiveRecording(true);
             await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
+            endVoiceBypass();
             router.back();
           },
         },
@@ -173,6 +203,7 @@ export default function VoiceScreen() {
     recordingRef.current = null;
     recording?.setOnRecordingStatusUpdate(null);
     recording?.stopAndUnloadAsync().catch(error => recordingError("unmount cleanup", error));
+    endVoiceBypass(0);
   }, []);
 
   const startRecording = async () => {
@@ -180,10 +211,13 @@ export default function VoiceScreen() {
       Alert.alert("Recording already active", "Stop the current recording before starting another.");
       return;
     }
+    beginVoiceBypass();
     try {
       await cleanupActiveRecording(true);
+      voiceDebug("requesting microphone permission");
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
+        endVoiceBypass();
         Alert.alert("Microphone permission needed", "Allow microphone access in Settings to record a voice memory.");
         return;
       }
@@ -195,9 +229,12 @@ export default function VoiceScreen() {
       recording.setOnRecordingStatusUpdate(status => {
         if (status.isRecording || status.canRecord) setRecordingDurationMillis(status.durationMillis);
       });
+      voiceDebug("preparing recorder", VOICE_RECORDING_OPTIONS.android);
       await recording.prepareToRecordAsync(VOICE_RECORDING_OPTIONS);
+      voiceDebug("starting recorder");
       const started = await recording.startAsync();
       if (!started.isRecording) throw new Error("Recorder did not enter recording state.");
+      voiceDebug("recorder started", { durationMillis: started.durationMillis });
       setPhase("recording");
       setStatusMessage("");
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -206,6 +243,7 @@ export default function VoiceScreen() {
       await cleanupActiveRecording(true);
       await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
       setPhase("idle");
+      endVoiceBypass();
       Alert.alert("Unable to record", "Recording could not start on this device. Please try again.");
     }
   };
@@ -214,11 +252,13 @@ export default function VoiceScreen() {
     const recording = recordingRef.current;
     if (!recording) {
       setPhase("idle");
+      endVoiceBypass();
       return;
     }
     let savedUri: string;
     let seconds = recordingDurationMillis / 1000;
     try {
+      voiceDebug("stopping recorder");
       const finalStatus = await recording.stopAndUnloadAsync();
       recording.setOnRecordingStatusUpdate(null);
       recordingRef.current = null;
@@ -228,11 +268,13 @@ export default function VoiceScreen() {
       if (!uri) throw new Error("Recording path unavailable after stop.");
       savedUri = await persistRecording(uri);
       await validateRecordingFile(savedUri);
+      voiceDebug("recording finalized", { durationMillis: finalStatus.durationMillis, format: "m4a" });
     } catch (error) {
       recordingError("stop/save", error);
       await cleanupActiveRecording(true);
       await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE).catch(() => {});
       setPhase("idle");
+      endVoiceBypass();
       Alert.alert("Recording could not be saved", "The local audio file could not be finalized. Please record again.");
       return;
     }
@@ -242,6 +284,7 @@ export default function VoiceScreen() {
     setPhase("processing");
     setStatusMessage("Transcribing your voice…");
     try {
+      voiceDebug("transcription started");
       const result = await transcribeVoice(savedUri, language);
       setTranscript(result.transcript);
       if (!result.transcript) setStatusMessage("We couldn’t transcribe automatically. Your recording is safe; you can type or paste the transcript.");
@@ -251,6 +294,7 @@ export default function VoiceScreen() {
       setStatusMessage("We couldn’t transcribe automatically. Your recording is safe; you can type or paste the transcript.");
     } finally {
       setPhase("review");
+      endVoiceBypass();
     }
   };
 
